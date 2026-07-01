@@ -1,0 +1,11 @@
+export interface Category {
+  id: number
+  name: string
+  color: string
+  createdAt: string
+}
+
+export interface CategoryInput {
+  name: string
+  color: string
+}

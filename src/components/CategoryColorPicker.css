@@ -1,0 +1,111 @@
+.color-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.color-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.color-picker-trigger:hover:not(:disabled) {
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.color-picker-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.color-picker-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1100;
+  width: 9.75rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.color-picker-palette {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.28rem;
+}
+
+.color-picker-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.color-picker-swatch:hover {
+  transform: scale(1.08);
+}
+
+.color-picker-swatch.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 1px var(--surface), 0 0 0 3px var(--text);
+}
+
+.color-picker-custom {
+  position: relative;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.color-picker-custom-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.color-picker-custom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.color-picker-custom-btn:hover:not(:disabled) {
+  background: var(--table-hover);
+  color: var(--text);
+}
+
+.color-picker-custom-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

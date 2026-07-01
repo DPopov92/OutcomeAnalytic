@@ -1,0 +1,108 @@
+.category-select {
+  position: relative;
+  width: 100%;
+  min-width: 180px;
+}
+
+.category-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-select-trigger:hover:not(:disabled) {
+  background: var(--table-hover);
+}
+
+.category-select-trigger:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 1px;
+}
+
+.category-select-trigger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.category-select-open .category-select-trigger {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.category-select-error .category-select-trigger {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.category-select-placeholder {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.category-select-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.category-select-open .category-select-chevron {
+  transform: rotate(180deg);
+}
+
+.category-select-label {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.15rem 0.55rem;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-select-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  margin: 0;
+  padding: 0.35rem;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.category-select-option {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-select-option:hover {
+  background: var(--table-hover);
+}
+
+.category-select-option-selected {
+  background: var(--table-head);
+}
