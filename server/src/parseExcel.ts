@@ -1,6 +1,18 @@
 import * as XLSX from 'xlsx'
-import type { ParsedExpenseRow } from '../types/expense'
-import { REQUIRED_COLUMNS } from '../types/expense'
+
+export const REQUIRED_COLUMNS = [
+  'Дата',
+  'Категория операции',
+  'Сумма',
+  'Описание',
+] as const
+
+export interface ParsedExpenseRow {
+  date: Date
+  operationCategory: string
+  amount: number
+  description: string
+}
 
 const COLUMN_ALIASES: Record<(typeof REQUIRED_COLUMNS)[number], string[]> = {
   Дата: ['дата', 'date'],
@@ -189,8 +201,16 @@ function isEmptyRow(row: unknown[]): boolean {
   )
 }
 
-export function parseExpenseExcel(file: ArrayBuffer): ParsedExpenseRow[] {
-  const workbook = XLSX.read(file, { type: 'array', cellDates: true })
+export function toDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function parseExpenseExcel(file: Buffer | ArrayBuffer): ParsedExpenseRow[] {
+  const buffer = file instanceof Buffer ? file : Buffer.from(file)
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
   const sheetName = workbook.SheetNames[0]
 
   if (!sheetName) {
@@ -252,7 +272,6 @@ export function parseExpenseExcel(file: ArrayBuffer): ParsedExpenseRow[] {
     }
 
     operations.push({
-      id: `${rowIndex}-${date.toISOString()}-${amount}`,
       date,
       operationCategory,
       amount,

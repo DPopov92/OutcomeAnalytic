@@ -1,6 +1,14 @@
 import { Router } from 'express'
-import { clearAllData, getLastImport, getOperations, replaceOperations } from '../db.js'
-import type { ImportPayload, OperationsResponse } from '../types.js'
+import {
+  cancelImportBatch,
+  clearAllData,
+  getImportPreview,
+  getLastImport,
+  getOperations,
+  saveGroupedOperations,
+  uploadFileOperations,
+} from '../db.js'
+import type { ImportPayload, OperationsResponse, PreviewResponse } from '../types.js'
 
 export const operationsRouter = Router()
 
@@ -26,16 +34,62 @@ operationsRouter.get('/', (_req, res) => {
   res.json(response)
 })
 
+operationsRouter.post('/upload', (req, res) => {
+  const fileBuffer = req.body
+
+  if (!Buffer.isBuffer(fileBuffer) || fileBuffer.length === 0) {
+    res.status(400).json({ message: 'Ожидается файл в теле запроса.' })
+    return
+  }
+
+  const rawFileName = req.headers['x-file-name']
+  const fileName =
+    typeof rawFileName === 'string'
+      ? decodeURIComponent(rawFileName)
+      : 'import.xlsx'
+
+  try {
+    const result = uploadFileOperations(fileBuffer, fileName)
+    res.status(201).json(result)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Не удалось обработать файл.'
+    res.status(400).json({ message })
+  }
+})
+
+operationsRouter.get('/preview/:batchId', (req, res) => {
+  const batchId = req.params.batchId
+
+  if (!batchId.trim()) {
+    res.status(400).json({ message: 'Укажите идентификатор загрузки.' })
+    return
+  }
+
+  const response: PreviewResponse = {
+    operations: getImportPreview(batchId),
+  }
+
+  res.json(response)
+})
+
+operationsRouter.delete('/batch/:batchId', (req, res) => {
+  const batchId = req.params.batchId
+
+  if (!batchId.trim()) {
+    res.status(400).json({ message: 'Укажите идентификатор загрузки.' })
+    return
+  }
+
+  cancelImportBatch(batchId)
+  res.status(204).send()
+})
+
 operationsRouter.post('/import', (req, res) => {
   const payload = req.body as ImportPayload
 
   if (!payload || !Array.isArray(payload.operations)) {
     res.status(400).json({ message: 'Ожидается массив operations.' })
-    return
-  }
-
-  if (!isValidPeriod(payload.month, payload.year)) {
-    res.status(400).json({ message: 'Укажите корректный месяц и год периода.' })
     return
   }
 
@@ -46,13 +100,17 @@ operationsRouter.post('/import', (req, res) => {
 
   for (const [index, operation] of payload.operations.entries()) {
     if (
+      !isValidPeriod(operation.month, operation.year) ||
+      typeof operation.operationCategory !== 'string' ||
+      typeof operation.description !== 'string' ||
       typeof operation.category !== 'string' ||
       typeof operation.amount !== 'number' ||
+      !operation.operationCategory.trim() ||
       !operation.category.trim() ||
       !Number.isFinite(operation.amount)
     ) {
       res.status(400).json({
-        message: `Некорректная операция в позиции ${index + 1}. Укажите категорию и сумму.`,
+        message: `Некорректная операция в позиции ${index + 1}.`,
       })
       return
     }
@@ -81,7 +139,7 @@ operationsRouter.post('/import', (req, res) => {
     }
   }
 
-  const operations = replaceOperations(payload)
+  const operations = saveGroupedOperations(payload)
 
   res.status(201).json({
     operations,

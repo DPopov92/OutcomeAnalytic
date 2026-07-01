@@ -1,19 +1,46 @@
-export interface OperationInput {
+export interface OperationRecord {
+  id: number
   month: number
   year: number
   category: string
   amount: number
 }
 
-export interface OperationRecord extends OperationInput {
+export interface FileOperationRecord {
   id: number
+  date: string
+  operationCategory: string
+  description: string
+  amount: number
+  importBatchId: string
+  fileName: string | null
+  importedAt: string
+}
+
+export interface GroupedPreviewRecord {
+  id: string
+  month: number
+  year: number
+  operationCategory: string
+  description: string
+  amount: number
+}
+
+export interface UploadResult {
+  batchId: string
+  fileName: string
+  inserted: number
+  skipped: number
 }
 
 export interface ImportPayload {
   fileName?: string
-  month: number
-  year: number
+  batchId?: string
   operations: Array<{
+    month: number
+    year: number
+    operationCategory: string
+    description: string
     category: string
     amount: number
   }>
@@ -24,10 +51,12 @@ export interface OperationsResponse {
   operations: OperationRecord[]
   lastImport: {
     fileName: string | null
-    periodMonth: number | null
-    periodYear: number | null
     importedAt: string | null
   } | null
+}
+
+export interface PreviewResponse {
+  operations: GroupedPreviewRecord[]
 }
 
 export interface CategoryRecord {

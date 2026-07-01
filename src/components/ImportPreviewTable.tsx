@@ -1,13 +1,19 @@
+import { DeleteIcon } from '../assets/icons/DeleteIcon'
+import { RestoreIcon } from '../assets/icons/RestoreIcon'
 import type { Category } from '../types/category'
+import { formatPeriod } from '../types/expense'
 import { CategorySelect } from './CategorySelect'
 import './ImportPreviewTable.css'
 
 export interface PreviewOperation {
   id: string
+  month: number
+  year: number
   operationCategory: string
   description: string
   amount: number
   userCategory: string
+  removed?: boolean
 }
 
 interface ImportPreviewTableProps {
@@ -16,7 +22,7 @@ interface ImportPreviewTableProps {
   categoryColors: Record<string, string>
   highlightMissingCategories?: boolean
   onUserCategoryChange: (id: string, userCategory: string) => void
-  onDeleteOperation?: (id: string) => void
+  onToggleOperationRemoved?: (id: string) => void
 }
 
 const amountFormatter = new Intl.NumberFormat('ru-RU', {
@@ -31,14 +37,15 @@ export function ImportPreviewTable({
   categoryColors,
   highlightMissingCategories = false,
   onUserCategoryChange,
-  onDeleteOperation,
+  onToggleOperationRemoved,
 }: ImportPreviewTableProps) {
-  const total = operations.reduce((sum, operation) => sum + operation.amount, 0)
+  const activeOperations = operations.filter((operation) => !operation.removed)
+  const total = activeOperations.reduce((sum, operation) => sum + operation.amount, 0)
 
   if (operations.length === 0) {
     return (
       <div className="table-empty">
-        <p>Все операции удалены. Добавьте строки в файл или отмените загрузку.</p>
+        <p>Нет операций для загрузки.</p>
       </div>
     )
   }
@@ -53,8 +60,14 @@ export function ImportPreviewTable({
           </p>
         </div>
         <p>
-          Всего: <strong>{operations.length}</strong> · Сумма:{' '}
-          <strong>{amountFormatter.format(total)}</strong>
+          Всего: <strong>{activeOperations.length}</strong>
+          {activeOperations.length !== operations.length ? (
+            <>
+              {' '}
+              из <strong>{operations.length}</strong>
+            </>
+          ) : null}{' '}
+          · Сумма: <strong>{amountFormatter.format(total)}</strong>
         </p>
       </div>
 
@@ -62,58 +75,61 @@ export function ImportPreviewTable({
         <table>
           <thead>
             <tr>
+              <th>Период</th>
               <th>Категория операции</th>
               <th>Описание</th>
               <th className="col-amount">Сумма</th>
               <th>Категории</th>
-              {onDeleteOperation && <th className="col-actions" aria-label="Действия" />}
+              {onToggleOperationRemoved && <th className="col-actions" aria-label="Действия" />}
             </tr>
           </thead>
           <tbody>
             {operations.map((operation) => {
               const hasUserCategory = operation.userCategory.trim().length > 0
+              const isRemoved = Boolean(operation.removed)
 
               return (
-                <tr key={operation.id}>
+                <tr
+                  key={operation.id}
+                  className={isRemoved ? 'import-preview-row-removed' : undefined}
+                >
+                  <td>{formatPeriod(operation.month, operation.year)}</td>
                   <td>{operation.operationCategory}</td>
                   <td>{operation.description || '—'}</td>
                   <td className="col-amount">{amountFormatter.format(operation.amount)}</td>
                   <td>
-                    <CategorySelect
-                      value={operation.userCategory}
-                      categories={categories}
-                      categoryColors={categoryColors}
-                      hasError={highlightMissingCategories && !hasUserCategory}
-                      onChange={(userCategory) =>
-                        onUserCategoryChange(operation.id, userCategory)
-                      }
-                    />
+                    {!isRemoved && (
+                      <CategorySelect
+                        value={operation.userCategory}
+                        categories={categories}
+                        categoryColors={categoryColors}
+                        hasError={highlightMissingCategories && !hasUserCategory}
+                        onChange={(userCategory) =>
+                          onUserCategoryChange(operation.id, userCategory)
+                        }
+                      />
+                    )}
                   </td>
-                  {onDeleteOperation && (
+                  {onToggleOperationRemoved && (
                     <td className="col-actions">
                       <button
                         type="button"
-                        className="row-delete-btn"
-                        onClick={() => onDeleteOperation(operation.id)}
-                        aria-label={`Удалить операцию: ${operation.operationCategory}`}
-                        title="Удалить операцию"
+                        className={
+                          isRemoved ? 'row-restore-btn' : 'row-delete-btn'
+                        }
+                        onClick={() => onToggleOperationRemoved(operation.id)}
+                        aria-label={
+                          isRemoved
+                            ? `Вернуть операцию: ${operation.operationCategory}`
+                            : `Исключить операцию: ${operation.operationCategory}`
+                        }
+                        title={isRemoved ? 'Вернуть операцию' : 'Исключить операцию'}
                       >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
+                        {isRemoved ? (
+                          <RestoreIcon size={16} strokeWidth={2} />
+                        ) : (
+                          <DeleteIcon size={16} strokeWidth={2} />
+                        )}
                       </button>
                     </td>
                   )}

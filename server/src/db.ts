@@ -1,14 +1,20 @@
+import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { groupFileOperations, buildGroupKey } from './groupOperations.js'
+import { parseExpenseExcel, toDateKey } from './parseExcel.js'
 import type {
   CategoryInput,
   CategoryMappingInput,
   CategoryMappingRecord,
   CategoryRecord,
+  FileOperationRecord,
+  GroupedPreviewRecord,
   ImportPayload,
   OperationRecord,
+  UploadResult,
 } from './types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -19,21 +25,6 @@ mkdirSync(dataDir, { recursive: true })
 
 const db = new DatabaseSync(dbPath)
 
-function groupOperationsByCategory(
-  operations: ImportPayload['operations'],
-): Array<{ category: string; amount: number }> {
-  const grouped = new Map<string, number>()
-
-  for (const operation of operations) {
-    const category = operation.category.trim()
-    grouped.set(category, (grouped.get(category) ?? 0) + operation.amount)
-  }
-
-  return Array.from(grouped.entries())
-    .map(([category, amount]) => ({ category, amount }))
-    .sort((left, right) => left.category.localeCompare(right.category, 'ru'))
-}
-
 function ensureSchema(): void {
   const operationsTable = db
     .prepare(
@@ -42,11 +33,21 @@ function ensureSchema(): void {
     .get() as { name: string } | undefined
 
   if (operationsTable) {
-    const columns = db.prepare('PRAGMA table_info(operations)').all() as Array<{ name: string }>
-    const hasGroupedSchema = columns.some((column) => column.name === 'month')
-    const hasDescription = columns.some((column) => column.name === 'description')
+    const columns = db.prepare('PRAGMA table_info(operations)').all() as Array<{
+      name: string
+    }>
+    const hasMonth = columns.some((column) => column.name === 'month')
+    const hasDate = columns.some((column) => column.name === 'date')
+    const tableSql = db
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'operations'",
+      )
+      .get() as { sql: string } | undefined
+    const hasLegacyUniqueConstraint = tableSql?.sql.includes(
+      'UNIQUE (date, operation_category, description)',
+    )
 
-    if (!hasGroupedSchema || hasDescription) {
+    if ((hasMonth && !hasDate) || hasLegacyUniqueConstraint) {
       db.exec('DROP TABLE operations')
       db.exec('DROP TABLE import_meta')
     }
@@ -55,17 +56,29 @@ function ensureSchema(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS operations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      operation_category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL,
+      import_batch_id TEXT NOT NULL,
+      file_name TEXT,
+      imported_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS grouped_operations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       month INTEGER NOT NULL,
       year INTEGER NOT NULL,
+      operation_category TEXT NOT NULL,
+      description TEXT NOT NULL,
       category TEXT NOT NULL,
-      amount REAL NOT NULL
+      amount REAL NOT NULL,
+      UNIQUE (month, year, operation_category, description)
     );
 
     CREATE TABLE IF NOT EXISTS import_meta (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       file_name TEXT,
-      period_month INTEGER,
-      period_year INTEGER,
       imported_at TEXT NOT NULL
     );
 
@@ -89,78 +102,254 @@ function ensureSchema(): void {
 
 ensureSchema()
 
-const selectAllStmt = db.prepare(`
-  SELECT id, month, year, category, amount
-  FROM operations
+const selectGroupedOperationsStmt = db.prepare(`
+  SELECT
+    MIN(id) AS id,
+    month,
+    year,
+    category,
+    SUM(amount) AS amount
+  FROM grouped_operations
+  GROUP BY month, year, category
   ORDER BY year DESC, month DESC, category ASC
 `)
 
 const selectMetaStmt = db.prepare(`
   SELECT
     file_name AS fileName,
-    period_month AS periodMonth,
-    period_year AS periodYear,
     imported_at AS importedAt
   FROM import_meta
   WHERE id = 1
 `)
 
-const insertOperationStmt = db.prepare(`
-  INSERT INTO operations (month, year, category, amount)
-  VALUES (@month, @year, @category, @amount)
+const insertFileOperationStmt = db.prepare(`
+  INSERT INTO operations (
+    date,
+    operation_category,
+    description,
+    amount,
+    import_batch_id,
+    file_name,
+    imported_at
+  )
+  VALUES (
+    @date,
+    @operationCategory,
+    @description,
+    @amount,
+    @importBatchId,
+    @fileName,
+    @importedAt
+  )
+`)
+
+const selectFileOperationsByBatchStmt = db.prepare(`
+  SELECT
+    id,
+    date,
+    operation_category AS operationCategory,
+    description,
+    amount,
+    import_batch_id AS importBatchId,
+    file_name AS fileName,
+    imported_at AS importedAt
+  FROM operations
+  WHERE import_batch_id = ?
+  ORDER BY date DESC, operation_category ASC, description ASC
+`)
+
+const deleteImportBatchStmt = db.prepare(`
+  DELETE FROM operations
+  WHERE import_batch_id = ?
+`)
+
+const existsGroupedOperationStmt = db.prepare(`
+  SELECT 1
+  FROM grouped_operations
+  WHERE month = ?
+    AND year = ?
+    AND operation_category = ?
+    AND description = ?
+  LIMIT 1
 `)
 
 const upsertMetaStmt = db.prepare(`
-  INSERT INTO import_meta (id, file_name, period_month, period_year, imported_at)
-  VALUES (1, @fileName, @periodMonth, @periodYear, @importedAt)
+  INSERT INTO import_meta (id, file_name, imported_at)
+  VALUES (1, @fileName, @importedAt)
   ON CONFLICT(id) DO UPDATE SET
     file_name = excluded.file_name,
-    period_month = excluded.period_month,
-    period_year = excluded.period_year,
     imported_at = excluded.imported_at
 `)
 
+const upsertGroupedOperationStmt = db.prepare(`
+  INSERT INTO grouped_operations (
+    month,
+    year,
+    operation_category,
+    description,
+    category,
+    amount
+  )
+  VALUES (
+    @month,
+    @year,
+    @operationCategory,
+    @description,
+    @category,
+    @amount
+  )
+  ON CONFLICT(month, year, operation_category, description) DO UPDATE SET
+    category = excluded.category,
+    amount = excluded.amount
+`)
+
 export function getOperations(): OperationRecord[] {
-  return selectAllStmt.all() as unknown as OperationRecord[]
+  return selectGroupedOperationsStmt.all() as unknown as OperationRecord[]
 }
 
 export function getLastImport() {
   return selectMetaStmt.get() as
     | {
         fileName: string | null
-        periodMonth: number | null
-        periodYear: number | null
         importedAt: string
       }
     | undefined
 }
 
-export function replaceOperations(payload: ImportPayload): OperationRecord[] {
-  const groupedOperations = groupOperationsByCategory(payload.operations)
+export function uploadFileOperations(
+  fileBuffer: Buffer,
+  fileName: string,
+): UploadResult {
+  const parsed = parseExpenseExcel(fileBuffer)
+  const batchId = randomUUID()
+  const importedAt = new Date().toISOString()
+  let inserted = 0
+  let skipped = 0
+
+  const groupedRows = new Map<
+    string,
+    {
+      month: number
+      year: number
+      operationCategory: string
+      description: string
+      rows: typeof parsed
+    }
+  >()
+
+  for (const row of parsed) {
+    const date = toDateKey(row.date)
+    const [yearStr, monthStr] = date.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const operationCategory = row.operationCategory.trim()
+    const description = row.description.trim()
+    const key = buildGroupKey(month, year, operationCategory, description)
+    const existing = groupedRows.get(key)
+
+    if (existing) {
+      existing.rows.push(row)
+      continue
+    }
+
+    groupedRows.set(key, {
+      month,
+      year,
+      operationCategory,
+      description,
+      rows: [row],
+    })
+  }
 
   db.exec('BEGIN IMMEDIATE')
 
   try {
-    db.exec('DELETE FROM operations')
+    for (const group of groupedRows.values()) {
+      const alreadySaved = existsGroupedOperationStmt.get(
+        group.month,
+        group.year,
+        group.operationCategory,
+        group.description,
+      )
 
-    for (const operation of groupedOperations) {
-      insertOperationStmt.run({
-        month: payload.month,
-        year: payload.year,
-        category: operation.category,
+      if (alreadySaved) {
+        skipped += 1
+        continue
+      }
+
+      for (const row of group.rows) {
+        insertFileOperationStmt.run({
+          date: toDateKey(row.date),
+          operationCategory: row.operationCategory.trim(),
+          description: row.description.trim(),
+          amount: row.amount,
+          importBatchId: batchId,
+          fileName,
+          importedAt,
+        })
+      }
+
+      inserted += 1
+    }
+
+    if (inserted > 0) {
+      upsertMetaStmt.run({
+        fileName,
+        importedAt,
+      })
+    }
+
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+
+  return {
+    batchId,
+    fileName,
+    inserted,
+    skipped,
+  }
+}
+
+export function cancelImportBatch(batchId: string): void {
+  deleteImportBatchStmt.run(batchId)
+}
+
+export function getImportPreview(batchId: string): GroupedPreviewRecord[] {
+  const rows = selectFileOperationsByBatchStmt.all(batchId) as FileOperationRecord[]
+  return groupFileOperations(rows)
+}
+
+export function saveGroupedOperations(payload: ImportPayload): OperationRecord[] {
+  db.exec('BEGIN IMMEDIATE')
+
+  try {
+    for (const operation of payload.operations) {
+      upsertGroupedOperationStmt.run({
+        month: operation.month,
+        year: operation.year,
+        operationCategory: operation.operationCategory.trim(),
+        description: operation.description.trim(),
+        category: operation.category.trim(),
         amount: operation.amount,
       })
     }
 
-    upsertMetaStmt.run({
-      fileName: payload.fileName ?? null,
-      periodMonth: payload.month,
-      periodYear: payload.year,
-      importedAt: new Date().toISOString(),
-    })
+    if (payload.fileName) {
+      upsertMetaStmt.run({
+        fileName: payload.fileName,
+        importedAt: new Date().toISOString(),
+      })
+    }
 
     if (payload.mappings?.length) {
       upsertCategoryMappings(payload.mappings)
+    }
+
+    if (payload.batchId?.trim()) {
+      deleteImportBatchStmt.run(payload.batchId.trim())
     }
 
     db.exec('COMMIT')
@@ -174,6 +363,7 @@ export function replaceOperations(payload: ImportPayload): OperationRecord[] {
 
 export function clearAllData(): void {
   db.exec('DELETE FROM operations')
+  db.exec('DELETE FROM grouped_operations')
   db.exec('DELETE FROM import_meta')
 }
 
@@ -205,14 +395,14 @@ const deleteCategoryStmt = db.prepare(`
   WHERE id = ?
 `)
 
-const countOperationsByCategoryStmt = db.prepare(`
+const countGroupedOperationsByCategoryStmt = db.prepare(`
   SELECT COUNT(*) AS count
-  FROM operations
+  FROM grouped_operations
   WHERE category = ?
 `)
 
-const renameOperationsCategoryStmt = db.prepare(`
-  UPDATE operations
+const renameGroupedOperationsCategoryStmt = db.prepare(`
+  UPDATE grouped_operations
   SET category = @newName
   WHERE category = @oldName
 `)
@@ -278,7 +468,7 @@ export function updateCategory(
 
   try {
     if (existing.name !== newName) {
-      renameOperationsCategoryStmt.run({
+      renameGroupedOperationsCategoryStmt.run({
         oldName: existing.name,
         newName,
       })
@@ -334,7 +524,9 @@ export function deleteCategory(id: number): { deleted: boolean; reason?: string 
     return { deleted: false, reason: 'not_found' }
   }
 
-  const usage = countOperationsByCategoryStmt.get(existing.name) as { count: number }
+  const usage = countGroupedOperationsByCategoryStmt.get(existing.name) as {
+    count: number
+  }
   if (usage.count > 0) {
     return { deleted: false, reason: 'in_use' }
   }

@@ -1,31 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCategories } from './api/categories'
 import {
+  cancelImportBatch,
   clearAllOperations,
+  fetchImportPreview,
   fetchOperations,
   importOperations,
   mapOperationDto,
+  uploadOperationsFile,
 } from './api/operations'
 import { CategoryManagerModal } from './components/CategoryManagerModal'
 import { FileUpload } from './components/FileUpload'
 import { ImportPreviewModal } from './components/ImportPreviewModal'
 import { OperationsTable } from './components/OperationsTable'
 import type { Category } from './types/category'
-import type { GroupedExpense, ParsedExpenseRow } from './types/expense'
-import { formatPeriod } from './types/expense'
+import type { GroupedExpense, GroupedPreviewOperation } from './types/expense'
 import { buildCategoryColorMap } from './utils/categoryColors'
-import { parseExpenseExcel } from './utils/parseExcel'
 import './App.css'
 
 interface ImportPreview {
   fileName: string
-  rawOperations: ParsedExpenseRow[]
+  batchId: string
+  operations: GroupedPreviewOperation[]
+  inserted: number
+  skipped: number
 }
 
 function App() {
   const [operations, setOperations] = useState<GroupedExpense[]>([])
   const [fileName, setFileName] = useState<string | null>(null)
-  const [periodLabel, setPeriodLabel] = useState<string | null>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [parsing, setParsing] = useState(false)
@@ -53,14 +56,6 @@ function App() {
         setCategories(loadedCategories)
         setOperations(data.operations.map(mapOperationDto))
         setFileName(data.lastImport?.fileName ?? null)
-
-        if (data.lastImport?.periodMonth && data.lastImport?.periodYear) {
-          setPeriodLabel(
-            formatPeriod(data.lastImport.periodMonth, data.lastImport.periodYear),
-          )
-        } else {
-          setPeriodLabel(null)
-        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -96,11 +91,25 @@ function App() {
     setError(null)
 
     try {
-      const buffer = await file.arrayBuffer()
-      const parsed = parseExpenseExcel(buffer)
+      const uploadResult = await uploadOperationsFile(file)
+
+      if (uploadResult.inserted === 0) {
+        setError(
+          uploadResult.skipped > 0
+            ? `Все ${uploadResult.skipped} операций из файла уже были загружены ранее.`
+            : 'В файле не найдено новых операций.',
+        )
+        return
+      }
+
+      const previewData = await fetchImportPreview(uploadResult.batchId)
+
       setPreview({
-        fileName: file.name,
-        rawOperations: parsed,
+        fileName: uploadResult.fileName,
+        batchId: uploadResult.batchId,
+        operations: previewData.operations,
+        inserted: uploadResult.inserted,
+        skipped: uploadResult.skipped,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось обработать файл.')
@@ -110,9 +119,11 @@ function App() {
   }
 
   async function handleConfirmSave(payload: {
-    month: number
-    year: number
     operations: Array<{
+      month: number
+      year: number
+      operationCategory: string
+      description: string
       category: string
       amount: number
     }>
@@ -132,21 +143,13 @@ function App() {
     try {
       const saved = await importOperations({
         fileName: preview.fileName,
-        month: payload.month,
-        year: payload.year,
+        batchId: preview.batchId,
         operations: payload.operations,
         mappings: payload.mappings,
       })
 
       setOperations(saved.operations.map(mapOperationDto))
       setFileName(saved.lastImport?.fileName ?? preview.fileName)
-
-      if (saved.lastImport?.periodMonth && saved.lastImport?.periodYear) {
-        setPeriodLabel(
-          formatPeriod(saved.lastImport.periodMonth, saved.lastImport.periodYear),
-        )
-      }
-
       setPreview(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить данные.')
@@ -155,12 +158,22 @@ function App() {
     }
   }
 
-  function handleCancelPreview() {
-    if (saving) {
+  async function handleCancelPreview() {
+    if (saving || !preview) {
       return
     }
 
-    setPreview(null)
+    const batchId = preview.batchId
+
+    try {
+      await cancelImportBatch(batchId)
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Не удалось отменить загрузку.',
+      )
+    } finally {
+      setPreview(null)
+    }
   }
 
   async function handleClearAll() {
@@ -179,7 +192,6 @@ function App() {
       await clearAllOperations()
       setOperations([])
       setFileName(null)
-      setPeriodLabel(null)
     } catch (err) {
       setError(
         err instanceof Error
@@ -227,7 +239,7 @@ function App() {
           </div>
         </div>
         <p>
-          Загрузите Excel-файл, назначьте категории операциям, выберите период и сохраните
+          Загрузите Excel-файл, назначьте категории операциям и сохраните
           сгруппированные данные.
         </p>
       </header>
@@ -247,12 +259,6 @@ function App() {
         {fileName && !parsing && !initialLoading && operations.length > 0 && (
           <p className="status status-success">
             Последний сохранённый файл: <strong>{fileName}</strong>
-            {periodLabel ? (
-              <>
-                {' '}
-                · Период: <strong>{periodLabel}</strong>
-              </>
-            ) : null}
           </p>
         )}
 
@@ -277,7 +283,9 @@ function App() {
       {preview && (
         <ImportPreviewModal
           fileName={preview.fileName}
-          rawOperations={preview.rawOperations}
+          operations={preview.operations}
+          inserted={preview.inserted}
+          skipped={preview.skipped}
           categories={categories}
           saving={saving}
           categoryColors={categoryColors}

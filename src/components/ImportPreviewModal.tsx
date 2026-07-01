@@ -1,34 +1,36 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchCategoryMappings } from '../api/categoryMappings'
-import {
-  buildMappingKey,
-  buildYearOptions,
-  getDefaultPeriod,
-  groupFileOperations,
-} from '../utils/groupOperations'
+import { buildMappingKey } from '../types/expense'
 import { ImportPreviewTable, type PreviewOperation } from './ImportPreviewTable'
-import type { CategoryMappingInput, GroupedExpenseInput, ParsedExpenseRow } from '../types/expense'
-import { formatPeriod, MONTH_NAMES } from '../types/expense'
+import type { CategoryMappingInput, GroupedPreviewOperation } from '../types/expense'
 import type { Category } from '../types/category'
 import './ImportPreviewModal.css'
 
-function buildPreviewOperations(rows: ParsedExpenseRow[]): PreviewOperation[] {
-  return groupFileOperations(rows).map((group) => ({
-    ...group,
+function buildEditableOperations(rows: GroupedPreviewOperation[]): PreviewOperation[] {
+  return rows.map((row) => ({
+    ...row,
     userCategory: '',
+    removed: false,
   }))
 }
 
 interface ImportPreviewModalProps {
   fileName: string
-  rawOperations: ParsedExpenseRow[]
+  operations: GroupedPreviewOperation[]
+  inserted: number
+  skipped: number
   categories: Category[]
   saving: boolean
   categoryColors?: Record<string, string>
   onConfirm: (payload: {
-    month: number
-    year: number
-    operations: GroupedExpenseInput[]
+    operations: Array<{
+      month: number
+      year: number
+      operationCategory: string
+      description: string
+      category: string
+      amount: number
+    }>
     mappings: CategoryMappingInput[]
   }) => void
   onCancel: () => void
@@ -36,21 +38,24 @@ interface ImportPreviewModalProps {
 
 export function ImportPreviewModal({
   fileName,
-  rawOperations,
+  operations,
+  inserted,
+  skipped,
   categories,
   saving,
   categoryColors = {},
   onConfirm,
   onCancel,
 }: ImportPreviewModalProps) {
-  const defaultPeriod = useMemo(() => getDefaultPeriod(rawOperations), [rawOperations])
-  const [month, setMonth] = useState(defaultPeriod.month)
-  const [year, setYear] = useState(defaultPeriod.year)
   const [editableOperations, setEditableOperations] = useState<PreviewOperation[]>(() =>
-    buildPreviewOperations(rawOperations),
+    buildEditableOperations(operations),
   )
   const [validationError, setValidationError] = useState<string | null>(null)
   const [mappingsLoading, setMappingsLoading] = useState(true)
+
+  useEffect(() => {
+    setEditableOperations(buildEditableOperations(operations))
+  }, [operations])
 
   useEffect(() => {
     let cancelled = false
@@ -103,16 +108,20 @@ export function ImportPreviewModal({
     return () => {
       cancelled = true
     }
-  }, [rawOperations, categories])
+  }, [operations, categories])
 
-  const allCategoriesAssigned = editableOperations.every(
+  const activeOperations = editableOperations.filter((operation) => !operation.removed)
+
+  const allCategoriesAssigned = activeOperations.every(
     (operation) => operation.userCategory.trim().length > 0,
   )
 
-  const yearOptions = useMemo(() => buildYearOptions(defaultPeriod.year), [defaultPeriod.year])
-
-  function handleDeleteOperation(id: string) {
-    setEditableOperations((current) => current.filter((operation) => operation.id !== id))
+  function handleToggleOperationRemoved(id: string) {
+    setEditableOperations((current) =>
+      current.map((operation) =>
+        operation.id === id ? { ...operation, removed: !operation.removed } : operation,
+      ),
+    )
     setValidationError(null)
   }
 
@@ -140,13 +149,17 @@ export function ImportPreviewModal({
 
     setValidationError(null)
     onConfirm({
-      month,
-      year,
-      operations: editableOperations.map(({ userCategory, amount }) => ({
-        category: userCategory.trim(),
-        amount,
-      })),
-      mappings: editableOperations.map(({ operationCategory, description, userCategory }) => ({
+      operations: activeOperations.map(
+        ({ month, year, operationCategory, description, userCategory, amount }) => ({
+          month,
+          year,
+          operationCategory,
+          description,
+          category: userCategory.trim(),
+          amount,
+        }),
+      ),
+      mappings: activeOperations.map(({ operationCategory, description, userCategory }) => ({
         operationCategory,
         description,
         category: userCategory.trim(),
@@ -170,6 +183,15 @@ export function ImportPreviewModal({
               Назначьте категории сгруппированным операциям из файла{' '}
               <strong>{fileName}</strong> перед сохранением.
             </p>
+            <p className="modal-subtitle">
+              Загружено новых операций: <strong>{inserted}</strong>
+              {skipped > 0 ? (
+                <>
+                  {' '}
+                  · Пропущено дубликатов: <strong>{skipped}</strong>
+                </>
+              ) : null}
+            </p>
           </div>
           <button
             type="button"
@@ -183,42 +205,6 @@ export function ImportPreviewModal({
         </header>
 
         <div className="modal-body">
-          <div className="period-selector">
-            <label className="period-field">
-              <span>Месяц</span>
-              <select
-                value={month}
-                disabled={saving}
-                onChange={(event) => setMonth(Number(event.target.value))}
-              >
-                {MONTH_NAMES.map((name, index) => (
-                  <option key={name} value={index + 1}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="period-field">
-              <span>Год</span>
-              <select
-                value={year}
-                disabled={saving}
-                onChange={(event) => setYear(Number(event.target.value))}
-              >
-                {yearOptions.map((optionYear) => (
-                  <option key={optionYear} value={optionYear}>
-                    {optionYear}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <p className="period-summary">
-              Период сохранения: <strong>{formatPeriod(month, year)}</strong>
-            </p>
-          </div>
-
           {mappingsLoading && (
             <p className="status status-loading">Загрузка сохранённых связей категорий…</p>
           )}
@@ -233,7 +219,7 @@ export function ImportPreviewModal({
             categoryColors={categoryColors}
             highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
             onUserCategoryChange={handleUserCategoryChange}
-            onDeleteOperation={saving ? undefined : handleDeleteOperation}
+            onToggleOperationRemoved={saving ? undefined : handleToggleOperationRemoved}
           />
         </div>
 
@@ -250,7 +236,7 @@ export function ImportPreviewModal({
             type="button"
             className="button button-primary"
             onClick={handleSave}
-            disabled={saving || editableOperations.length === 0 || mappingsLoading}
+            disabled={saving || activeOperations.length === 0 || mappingsLoading}
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>

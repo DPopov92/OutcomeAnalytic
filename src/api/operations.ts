@@ -12,10 +12,28 @@ export interface OperationsResponse {
   operations: OperationDto[]
   lastImport: {
     fileName: string | null
-    periodMonth: number | null
-    periodYear: number | null
     importedAt: string | null
   } | null
+}
+
+export interface UploadResponse {
+  batchId: string
+  fileName: string
+  inserted: number
+  skipped: number
+}
+
+export interface PreviewOperationDto {
+  id: string
+  month: number
+  year: number
+  operationCategory: string
+  description: string
+  amount: number
+}
+
+export interface PreviewResponse {
+  operations: PreviewOperationDto[]
 }
 
 export interface CategoryMappingInput {
@@ -26,9 +44,12 @@ export interface CategoryMappingInput {
 
 export interface ImportOperationsPayload {
   fileName?: string
-  month: number
-  year: number
+  batchId?: string
   operations: Array<{
+    month: number
+    year: number
+    operationCategory: string
+    description: string
     category: string
     amount: number
   }>
@@ -67,6 +88,48 @@ export function mapOperationDto(dto: OperationDto): GroupedExpense {
 export async function fetchOperations(): Promise<OperationsResponse> {
   const response = await fetch('/api/operations')
   return parseJsonResponse<OperationsResponse>(response)
+}
+
+export async function uploadOperationsFile(file: File): Promise<UploadResponse> {
+  const response = await fetch('/api/operations/upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-File-Name': encodeURIComponent(file.name),
+    },
+    body: file,
+  })
+
+  return parseJsonResponse<UploadResponse>(response)
+}
+
+export async function fetchImportPreview(batchId: string): Promise<PreviewResponse> {
+  const response = await fetch(`/api/operations/preview/${encodeURIComponent(batchId)}`)
+  return parseJsonResponse<PreviewResponse>(response)
+}
+
+export async function cancelImportBatch(batchId: string): Promise<void> {
+  const response = await fetch(
+    `/api/operations/batch/${encodeURIComponent(batchId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (!response.ok) {
+    let message = 'Не удалось отменить загрузку.'
+
+    try {
+      const body = (await response.json()) as { message?: string }
+      if (body.message) {
+        message = body.message
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    throw new Error(message)
+  }
 }
 
 export async function importOperations(
