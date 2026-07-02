@@ -209,7 +209,10 @@ export function toDateKey(date: Date): string {
 }
 
 export function parseExpenseExcel(file: Buffer | ArrayBuffer): ParsedExpenseRow[] {
-  const buffer = file instanceof Buffer ? file : Buffer.from(file)
+  const buffer =
+    file instanceof Buffer
+      ? file
+      : Buffer.from(file instanceof ArrayBuffer ? new Uint8Array(file) : file)
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
   const sheetName = workbook.SheetNames[0]
 

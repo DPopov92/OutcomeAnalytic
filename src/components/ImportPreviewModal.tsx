@@ -209,6 +209,15 @@ export function ImportPreviewModal({
     setValidationError(null)
   }
 
+  function handleAmountChange(id: string, amount: number) {
+    setEditableOperations((current) =>
+      current.map((operation) =>
+        operation.id === id ? { ...operation, amount } : operation,
+      ),
+    )
+    setValidationError(null)
+  }
+
   function handleToggleReceiptGroupRemoved(groupId: string) {
     setReceiptGroups((current) =>
       current.map((group) => {
@@ -403,6 +412,7 @@ export function ImportPreviewModal({
                 categoryColors={categoryColors}
                 highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
                 onUserCategoryChange={handleUserCategoryChange}
+                onAmountChange={saving ? undefined : handleAmountChange}
                 onToggleOperationRemoved={saving ? undefined : handleToggleOperationRemoved}
               />
             </>

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import {
+  addManualOperation,
   cancelImportBatch,
   clearAllData,
   getImportPreview,
@@ -9,7 +10,13 @@ import {
   uploadExcelFileOperations,
   uploadOzonFileOperations,
 } from '../db.js'
-import type { ImportPayload, OperationsResponse, PreviewResponse, UploadResult } from '../types.js'
+import type {
+  ImportPayload,
+  ManualOperationInput,
+  OperationsResponse,
+  PreviewResponse,
+  UploadResult,
+} from '../types.js'
 
 export const operationsRouter = Router()
 
@@ -33,6 +40,45 @@ operationsRouter.get('/', (_req, res) => {
   }
 
   res.json(response)
+})
+
+function isValidGroupedOperation(
+  operation: unknown,
+): operation is ManualOperationInput {
+  if (!operation || typeof operation !== 'object') {
+    return false
+  }
+
+  const candidate = operation as ManualOperationInput
+
+  return (
+    isValidPeriod(candidate.month, candidate.year) &&
+    typeof candidate.operationCategory === 'string' &&
+    typeof candidate.description === 'string' &&
+    typeof candidate.category === 'string' &&
+    typeof candidate.amount === 'number' &&
+    candidate.operationCategory.trim().length > 0 &&
+    candidate.description.trim().length > 0 &&
+    candidate.category.trim().length > 0 &&
+    Number.isFinite(candidate.amount) &&
+    candidate.amount !== 0
+  )
+}
+
+operationsRouter.post('/', (req, res) => {
+  const payload = req.body as ManualOperationInput
+
+  if (!isValidGroupedOperation(payload)) {
+    res.status(400).json({ message: 'Некорректные данные операции.' })
+    return
+  }
+
+  const operations = addManualOperation(payload)
+
+  res.status(201).json({
+    operations,
+    lastImport: getLastImport() ?? null,
+  } satisfies OperationsResponse)
 })
 
 function handleUpload(
@@ -161,6 +207,11 @@ operationsRouter.post('/import', (req, res) => {
 })
 
 operationsRouter.delete('/', (_req, res) => {
+  if (process.env.APP_ENV === 'production') {
+    res.status(403).json({ message: 'Недоступно в production.' })
+    return
+  }
+
   clearAllData()
 
   res.json({

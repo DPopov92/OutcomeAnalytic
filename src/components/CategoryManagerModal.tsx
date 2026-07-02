@@ -38,7 +38,7 @@ export function CategoryManagerModal({
   onOperationsCategoryRenamed,
 }: CategoryManagerModalProps) {
   const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState(DEFAULT_COLOR)
+  const [newColor, setNewColor] = useState<string>(DEFAULT_COLOR)
   const [editState, setEditState] = useState<EditState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

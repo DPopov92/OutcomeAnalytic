@@ -60,19 +60,23 @@ export interface UploadResult {
   ozonReceipts?: OzonReceiptDto[]
 }
 
+export interface GroupedOperationInput {
+  month: number
+  year: number
+  operationCategory: string
+  description: string
+  category: string
+  amount: number
+}
+
 export interface ImportPayload {
   fileName?: string
   batchId?: string
-  operations: Array<{
-    month: number
-    year: number
-    operationCategory: string
-    description: string
-    category: string
-    amount: number
-  }>
+  operations: GroupedOperationInput[]
   mappings?: CategoryMappingInput[]
 }
+
+export interface ManualOperationInput extends GroupedOperationInput {}
 
 export interface OperationsResponse {
   operations: OperationRecord[]

@@ -10,7 +10,6 @@ import { buildCategoryColorMap } from '../utils/categoryColors'
 import {
   filterOperationsByPeriod,
   getLatestPeriod,
-  getMonthsForYear,
   type OperationPeriod,
 } from '../utils/operationPeriods'
 import './CategoriesPage.css'

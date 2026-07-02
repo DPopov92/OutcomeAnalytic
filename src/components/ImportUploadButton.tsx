@@ -4,8 +4,10 @@ import './ImportUpload.css'
 interface ImportUploadButtonProps {
   label: string
   accept: string
-  hint: string
+  hint?: string
   disabled?: boolean
+  inline?: boolean
+  showHint?: boolean
   onFileSelect: (file: File) => void
   children?: ReactNode
 }
@@ -15,11 +17,13 @@ export function ImportUploadButton({
   accept,
   hint,
   disabled,
+  inline = false,
+  showHint = true,
   onFileSelect,
   children,
 }: ImportUploadButtonProps) {
-  return (
-    <div className="import-upload-card">
+  const content = (
+    <>
       <label className="import-upload-label">
         <input
           type="file"
@@ -33,10 +37,16 @@ export function ImportUploadButton({
             event.target.value = ''
           }}
         />
-        <span className="import-upload-button">{label}</span>
-        <span className="import-upload-hint">{hint}</span>
+        <span className="import-upload-action-btn">{label}</span>
+        {showHint && hint ? <span className="import-upload-hint">{hint}</span> : null}
       </label>
       {children}
-    </div>
+    </>
   )
+
+  if (inline) {
+    return content
+  }
+
+  return <div className="import-upload-card">{content}</div>
 }

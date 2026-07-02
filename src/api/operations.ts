@@ -47,19 +47,23 @@ export interface CategoryMappingInput {
   category: string
 }
 
+export interface GroupedOperationInput {
+  month: number
+  year: number
+  operationCategory: string
+  description: string
+  category: string
+  amount: number
+}
+
 export interface ImportOperationsPayload {
   fileName?: string
   batchId?: string
-  operations: Array<{
-    month: number
-    year: number
-    operationCategory: string
-    description: string
-    category: string
-    amount: number
-  }>
+  operations: GroupedOperationInput[]
   mappings?: CategoryMappingInput[]
 }
+
+export interface AddOperationPayload extends GroupedOperationInput {}
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -148,6 +152,20 @@ export async function cancelImportBatch(batchId: string): Promise<void> {
 
     throw new Error(message)
   }
+}
+
+export async function addOperation(
+  payload: AddOperationPayload,
+): Promise<OperationsResponse> {
+  const response = await fetch('/api/operations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  return parseJsonResponse<OperationsResponse>(response)
 }
 
 export async function importOperations(

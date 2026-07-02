@@ -10,6 +10,7 @@ import {
   uploadExcelFile,
   uploadOzonFile,
 } from '../api/operations'
+import { AddOperationModal } from '../components/AddOperationModal'
 import { CategoryManagerModal } from '../components/CategoryManagerModal'
 import { ImportPreviewModal } from '../components/ImportPreviewModal'
 import { ImportUploadSection } from '../components/ImportUploadSection'
@@ -49,6 +50,7 @@ export function HomePage() {
   const [clearing, setClearing] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false)
+  const [addOperationOpen, setAddOperationOpen] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<OperationPeriod | null>(
     null,
   )
@@ -122,12 +124,13 @@ export function HomePage() {
   }, [])
 
   useEffect(() => {
-    document.body.style.overflow = preview || categoryManagerOpen ? 'hidden' : ''
+    document.body.style.overflow =
+      preview || categoryManagerOpen || addOperationOpen ? 'hidden' : ''
 
     return () => {
       document.body.style.overflow = ''
     }
-  }, [preview, categoryManagerOpen])
+  }, [preview, categoryManagerOpen, addOperationOpen])
 
   async function handleImportFile(
     file: File,
@@ -290,24 +293,33 @@ export function HomePage() {
             >
               Категории
             </button>
-            <button
-              type="button"
-              className="dev-clear-btn"
-              onClick={() => void handleClearAll()}
-              disabled={clearing || initialLoading || saving || preview !== null}
-              title="Только для тестирования"
-            >
-              {clearing ? 'Очистка…' : 'Очистить БД'}
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                className="dev-clear-btn"
+                onClick={() => void handleClearAll()}
+                disabled={clearing || initialLoading || saving || preview !== null}
+                title="Только для тестирования"
+              >
+                {clearing ? 'Очистка…' : 'Очистить БД'}
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="page-main">
         <ImportUploadSection
-          disabled={parsing || saving || initialLoading || preview !== null}
+          disabled={
+            parsing ||
+            saving ||
+            initialLoading ||
+            preview !== null ||
+            addOperationOpen
+          }
           onExcelFileSelect={(file) => void handleExcelFileSelect(file)}
           onOzonFileSelect={(file) => void handleOzonFileSelect(file)}
+          onAddOperation={() => setAddOperationOpen(true)}
         />
 
         {initialLoading && (
@@ -352,6 +364,19 @@ export function HomePage() {
           onClose={() => setCategoryManagerOpen(false)}
           onCategoriesChange={setCategories}
           onOperationsCategoryRenamed={handleOperationsCategoryRenamed}
+        />
+      )}
+
+      {addOperationOpen && (
+        <AddOperationModal
+          categories={categories}
+          categoryColors={categoryColors}
+          onClose={() => setAddOperationOpen(false)}
+          onSaved={(savedOperations) => {
+            setOperations(savedOperations)
+            setAddOperationOpen(false)
+            setError(null)
+          }}
         />
       )}
 

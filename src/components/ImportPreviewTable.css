@@ -5,3 +5,61 @@
 .import-preview-row-removed td {
   opacity: 0.55;
 }
+
+.import-preview-table .col-amount {
+  min-width: 8.5rem;
+}
+
+.import-preview-amount-display {
+  display: block;
+  width: 100%;
+  min-width: 7.5rem;
+  max-width: 11rem;
+  margin-left: auto;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.import-preview-amount-display:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--table-hover);
+}
+
+.import-preview-amount-display:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.import-preview-amount-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 7.5rem;
+  max-width: 11rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.import-preview-amount-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.import-preview-amount-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

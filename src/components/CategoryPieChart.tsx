@@ -102,8 +102,10 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
       return
     }
 
+    const legendEl = legend
+
     function syncChartSize() {
-      const legendHeight = legend.offsetHeight
+      const legendHeight = legendEl.offsetHeight
       const nextSize = Math.max(
         MIN_CHART_SIZE,
         Math.min(legendHeight, MAX_CHART_SIZE),

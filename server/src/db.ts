@@ -15,12 +15,15 @@ import type {
   FileOperationRecord,
   GroupedPreviewRecord,
   ImportPayload,
+  ManualOperationInput,
   OperationRecord,
   UploadResult,
 } from './types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const dataDir = join(__dirname, '..', 'data')
+const appEnv = process.env.APP_ENV ?? 'development'
+const dbSubdir = appEnv === 'production' ? 'prod' : 'dev'
+const dataDir = join(__dirname, '..', 'data', dbSubdir)
 const dbPath = join(dataDir, 'outcome-analytic.db')
 
 mkdirSync(dataDir, { recursive: true })
@@ -347,8 +350,30 @@ export function cancelImportBatch(batchId: string): void {
 }
 
 export function getImportPreview(batchId: string): GroupedPreviewRecord[] {
-  const rows = selectFileOperationsByBatchStmt.all(batchId) as FileOperationRecord[]
+  const rows = selectFileOperationsByBatchStmt.all(batchId) as unknown as FileOperationRecord[]
   return groupFileOperations(rows)
+}
+
+export function addManualOperation(input: ManualOperationInput): OperationRecord[] {
+  return saveGroupedOperations({
+    operations: [
+      {
+        month: input.month,
+        year: input.year,
+        operationCategory: input.operationCategory.trim(),
+        description: input.description.trim(),
+        category: input.category.trim(),
+        amount: input.amount,
+      },
+    ],
+    mappings: [
+      {
+        operationCategory: input.operationCategory.trim(),
+        description: input.description.trim(),
+        category: input.category.trim(),
+      },
+    ],
+  })
 }
 
 export function saveGroupedOperations(payload: ImportPayload): OperationRecord[] {
