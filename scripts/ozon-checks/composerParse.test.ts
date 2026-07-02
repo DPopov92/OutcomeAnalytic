@@ -61,6 +61,30 @@ test('extractReceiptsFromComposer derives unit price from line total', () => {
   assert.equal(receipts[0]?.items[1]?.price, 800)
 })
 
+test('extractReceiptsFromComposer prefers line total over discount price', () => {
+  const payload = {
+    cheques: [
+      {
+        createdAt: '2026-07-01T20:00:00+03:00',
+        totalPrice: 12998,
+        products: [
+          {
+            title: 'Запеканка без добавления сахара с грушей и корицей, 200 г, Ozon fresh',
+            quantity: 1,
+            price: 900,
+            totalPrice: 12998,
+          },
+        ],
+      },
+    ],
+  }
+
+  const receipts = extractReceiptsFromComposer(payload)
+  assert.equal(receipts.length, 1)
+  assert.equal(receipts[0]?.items[0]?.price, 129.98)
+  assert.equal(receipts[0]?.totalAmount, 129.98)
+})
+
 test('extractDownloadUrlsFromComposer keeps only real download links', () => {
   const payload = {
     cheques: [

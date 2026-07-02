@@ -1,6 +1,7 @@
 import type { ParsedExpenseRow } from './parseExcel.js'
 import {
   isOzonReceiptsFile,
+  normalizeReceipt,
   receiptItemLineTotal,
   type OzonReceipt,
   type OzonReceiptsFile,
@@ -52,14 +53,14 @@ export function parseOzonReceiptsFile(
   const rows: ParsedExpenseRow[] = []
 
   for (const receipt of filteredReceipts) {
-    rows.push(...mapReceiptToExpenseRows(receipt, splitByItems))
+    rows.push(...mapReceiptToExpenseRows(normalizeReceipt(receipt), splitByItems))
   }
 
   return {
     rows: rows.sort((a, b) => b.date.getTime() - a.date.getTime()),
     receiptsFile: {
       ...receiptsFile,
-      receipts: filteredReceipts,
+      receipts: filteredReceipts.map((receipt) => normalizeReceipt(receipt)),
     },
   }
 }

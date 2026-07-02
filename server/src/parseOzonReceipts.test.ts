@@ -49,6 +49,24 @@ test('parseOzonReceiptPdfText extracts date, total and items', () => {
   assert.match(receipt.date, /2026-03-15/)
 })
 
+test('parseOzonReceiptPdfText ignores vat amount before line total', () => {
+  const fixturePath = join(
+    __dirname,
+    '..',
+    '..',
+    'scripts',
+    'fixtures',
+    'ozon-receipt-text-vat-amount-before-total.txt',
+  )
+  const receipt = parseOzonReceiptPdfText(readFileSync(fixturePath, 'utf8'))
+
+  assert.ok(receipt)
+  assert.equal(receipt.totalAmount, 129.98)
+  assert.equal(receipt.items.length, 1)
+  assert.equal(receipt.items[0]?.price, 129.98)
+  assert.equal(receipt.items[0]?.quantity, 1)
+})
+
 test('parseOzonReceiptPdfText parses quantity and unit price', () => {
   const fixturePath = join(
     __dirname,

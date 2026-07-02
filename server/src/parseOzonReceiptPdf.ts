@@ -1,6 +1,6 @@
 import { PDFParse } from 'pdf-parse'
 import type { OzonReceipt, OzonReceiptItem } from './ozonReceiptTypes.js'
-import { normalizeReceipt, sumReceiptItems } from './ozonReceiptTypes.js'
+import { normalizeReceipt, pickReceiptLineTotal, resolveReceiptUnitPrice, sumReceiptItems } from './ozonReceiptTypes.js'
 
 const ADVANCE_RECEIPT_PATTERN = /(?:авансов|предоплат)/i
 const RETURN_RECEIPT_PATTERN = /(?:возврат\s+прихода|возврат\s+расхода)/i
@@ -10,7 +10,7 @@ const DATE_PATTERN =
   /(\d{2})\.(\d{2})\.(\d{2,4})(?:[^\d](\d{2}):(\d{2}))?/
 const NUMBERED_ITEM_PATTERN = /^([1-9]\d{0,2})[.)]\s+(.+)$/
 const QTY_PRICE_PATTERN =
-  /(\d+(?:[.,]\d+)?)\s*(?:шт\.?|x|×|х|\*)\s*(\d[\d\s]*(?:[.,]\d{2})?)/i
+  /(\d+(?:[.,]\d+)?)\s*(?:шт\.?\s*)?(?:x|×|х|\*)\s*(\d[\d\s]*(?:[.,]\d{2})?)/i
 const AMOUNT_PATTERN = /^(\d[\d\s]*(?:[.,]\d{2})?)$/
 const TABLE_ROW_PATTERN =
   /^(.+?)\s+(\d+(?:[.,]\d+)?)\s+(\d[\d\s]*(?:[.,]\d{2})?)\s+(\d[\d\s]*(?:[.,]\d{2})?)$/
@@ -163,7 +163,7 @@ function extractReceiptItems(text: string): OzonReceiptItem[] {
       const lineTotal = parseRubAmount(tableMatch[4] ?? '')
 
       if (name && !looksLikeHeader(name)) {
-        const price = resolveUnitPrice(unitPrice, lineTotal, quantity)
+        const price = resolveReceiptUnitPrice(unitPrice, lineTotal, quantity)
         if (price != null && price > 0) {
           items.push({ name, quantity, price })
         }
@@ -202,13 +202,18 @@ function parseItemBlock(
 
   let quantity = 1
   let unitPrice: number | null = null
-  let lineTotal: number | null = null
-  let consumedLines = 0
+  const amountLines: number[] = []
+  let endIndex = startIndex
 
-  for (let index = startIndex; index < Math.min(lines.length, startIndex + 5); index += 1) {
+  for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index] ?? ''
 
+    if (NUMBERED_ITEM_PATTERN.test(line)) {
+      break
+    }
+
     if (isTotalOrMetaLine(line)) {
+      endIndex = index
       break
     }
 
@@ -216,14 +221,14 @@ function parseItemBlock(
     if (qtyPriceMatch) {
       quantity = parseQuantityToken(qtyPriceMatch[1] ?? '1')
       unitPrice = parseRubAmount(qtyPriceMatch[2] ?? '')
-      consumedLines += 1
+      endIndex = index + 1
       continue
     }
 
     const qtyOnlyMatch = line.match(/^(\d+(?:[.,]\d+)?)\s*(?:шт\.?|штук(?:а|и)?)/i)
     if (qtyOnlyMatch) {
       quantity = parseQuantityToken(qtyOnlyMatch[1] ?? '1')
-      consumedLines += 1
+      endIndex = index + 1
       continue
     }
 
@@ -231,14 +236,17 @@ function parseItemBlock(
     if (amountMatch) {
       const amount = parseRubAmount(amountMatch[1] ?? '')
       if (amount != null) {
-        lineTotal = amount
-        consumedLines += 1
-        break
+        amountLines.push(amount)
       }
+      endIndex = index + 1
+      continue
     }
+
+    endIndex = index + 1
   }
 
-  const price = resolveUnitPrice(unitPrice, lineTotal, quantity)
+  const lineTotal = pickReceiptLineTotal(amountLines, unitPrice, quantity)
+  const price = resolveReceiptUnitPrice(unitPrice, lineTotal, quantity)
   if (price == null || price <= 0) {
     return null
   }
@@ -247,7 +255,7 @@ function parseItemBlock(
     name,
     quantity,
     price,
-    nextIndex: startIndex + Math.max(1, consumedLines),
+    nextIndex: endIndex,
   }
 }
 
@@ -278,40 +286,13 @@ function parseQuantityToken(value: string): number {
   return Math.round(parsed * 1000) / 1000
 }
 
-function resolveUnitPrice(
-  unitPrice: number | null,
-  lineTotal: number | null,
-  quantity: number,
-): number | null {
-  const qty = Math.max(1, quantity)
-
-  if (unitPrice != null && lineTotal != null) {
-    if (Math.abs(unitPrice * qty - lineTotal) <= 0.02) {
-      return unitPrice
-    }
-
-    if (Math.abs(unitPrice - lineTotal) <= 0.02) {
-      return Math.round((lineTotal / qty) * 100) / 100
-    }
-  }
-
-  if (unitPrice != null) {
-    return unitPrice
-  }
-
-  if (lineTotal != null) {
-    return Math.round((lineTotal / qty) * 100) / 100
-  }
-
-  return null
-}
-
 function isTotalOrMetaLine(line: string): boolean {
   return (
     TOTAL_LINE_PATTERN.test(line) ||
     /^(?:наименование|кол\.?|количество|цена|сумма|ндс|фн|фп|фд|смена|кассир|приход|расход)/i.test(
       line,
-    )
+    ) ||
+    /\bндс\b/i.test(line)
   )
 }
 

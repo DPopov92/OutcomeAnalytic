@@ -1,5 +1,9 @@
 import type { OzonReceipt, OzonReceiptItem } from '../../server/src/ozonReceiptTypes.js'
-import { normalizeReceiptItem, sumReceiptItems } from '../../server/src/ozonReceiptTypes.js'
+import {
+  normalizeReceiptItem,
+  resolveReceiptUnitPrice,
+  sumReceiptItems,
+} from '../../server/src/ozonReceiptTypes.js'
 
 const RECEIPT_ARRAY_KEYS = ['cheques', 'checks', 'receipts', 'eChecks', 'echecks', 'items', 'list']
 const PRODUCT_ARRAY_KEYS = ['products', 'items', 'goods', 'positions', 'skuList', 'lineItems']
@@ -209,13 +213,18 @@ function normalizeItem(raw: unknown): OzonReceiptItem | null {
   const record = raw as Record<string, unknown>
   const name = pickString(record, ['name', 'title', 'productName', 'skuName', 'text'])
   const quantity = pickQuantity(record)
-  const unitPrice = normalizeMoney(
-    pickValue(record, ['pricePerUnit', 'unitPrice', 'singlePrice', 'itemPrice', 'price']),
-  )
   const lineTotal = normalizeMoney(
-    pickValue(record, ['totalPrice', 'lineTotal', 'amount', 'sum']),
+    pickValue(record, ['totalPrice', 'lineTotal', 'finalPrice', 'amount', 'sum', 'total']),
   )
-  const price = resolveUnitPrice(unitPrice, lineTotal, quantity)
+  const unitPrice = normalizeMoney(
+    pickValue(record, ['pricePerUnit', 'unitPrice', 'singlePrice', 'itemPrice']),
+  )
+  const listPrice = normalizeMoney(record.price)
+  const price = resolveReceiptUnitPrice(
+    unitPrice ?? (lineTotal == null ? listPrice : null),
+    lineTotal,
+    quantity,
+  )
 
   if (!name || price == null || price <= 0) {
     return null
@@ -289,10 +298,15 @@ function normalizeMoney(value: unknown): number | null {
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>
     return (
+      normalizeMoney(record.totalPrice) ??
+      normalizeMoney(record.finalPrice) ??
+      normalizeMoney(record.lineTotal) ??
       normalizeMoney(record.amount) ??
+      normalizeMoney(record.sum) ??
+      normalizeMoney(record.total) ??
       normalizeMoney(record.value) ??
-      normalizeMoney(record.price) ??
-      normalizeMoney(record.text)
+      normalizeMoney(record.text) ??
+      normalizeMoney(record.price)
     )
   }
 
@@ -319,34 +333,6 @@ function pickQuantity(record: Record<string, unknown>): number {
   }
 
   return 1
-}
-
-function resolveUnitPrice(
-  unitPrice: number | null,
-  lineTotal: number | null,
-  quantity: number,
-): number | null {
-  const qty = Math.max(1, quantity)
-
-  if (unitPrice != null && lineTotal != null) {
-    if (Math.abs(unitPrice * qty - lineTotal) <= 0.02) {
-      return unitPrice
-    }
-
-    if (Math.abs(unitPrice - lineTotal) <= 0.02) {
-      return Math.round((lineTotal / qty) * 100) / 100
-    }
-  }
-
-  if (unitPrice != null) {
-    return unitPrice
-  }
-
-  if (lineTotal != null) {
-    return Math.round((lineTotal / qty) * 100) / 100
-  }
-
-  return null
 }
 
 function cleanName(value: string): string {

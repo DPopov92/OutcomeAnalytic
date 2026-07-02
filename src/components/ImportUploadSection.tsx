@@ -35,33 +35,15 @@ export function OzonFileUpload({ disabled, onFileSelect }: OzonFileUploadProps) 
     <ImportUploadButton
       label="Загрузка OZON"
       accept=".json,application/json"
-      hint="JSON-файл чеков из npm run ozon:checks"
+      hint="JSON-файл с чеками Ozon"
       disabled={disabled}
       onFileSelect={onFileSelect}
     >
-      <div className="import-upload-details">
-        <p>
-          Электронные чеки Ozon:{' '}
-          <a href="https://www.ozon.ru/my/e-check" target="_blank" rel="noreferrer">
-            ozon.ru/my/e-check
-          </a>
-        </p>
-        <ol>
-          <li>
-            Один раз выполните <code>npm run ozon:checks:login</code> во внешнем терминале
-            Windows (PowerShell) и войдите в аккаунт
-          </li>
-          <li>
-            Если Ozon не открывается, добавьте{' '}
-            <code>-- --browser chrome</code> (нужен установленный Google Chrome)
-          </li>
-          <li>
-            Выгрузите чеки за месяц:{' '}
-            <code>npm run ozon:checks -- --month YYYY-MM</code>
-          </li>
-          <li>Загрузите полученный JSON кнопкой выше</li>
-        </ol>
-      </div>
+      <p className="import-upload-details">
+        Выгрузите чеки: <code>npm run ozon:checks -- --month YYYY-MM</code>
+        <br />
+        При первом запуске: <code>npm run ozon:checks:login</code>
+      </p>
     </ImportUploadButton>
   )
 }
