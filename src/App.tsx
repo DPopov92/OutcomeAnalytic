@@ -2,7 +2,6 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { HomePage } from './pages/HomePage'
-import './App.css'
 
 function App() {
   return (

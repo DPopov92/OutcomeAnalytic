@@ -1,4 +1,6 @@
-import { getCategoryBadgeStyle } from '../utils/categoryColors'
+import Box from '@mui/material/Box'
+import { useTheme } from '@mui/material/styles'
+import { getCategoryBadgeSx } from '../utils/categoryColors'
 
 interface CategoryBadgeProps {
   name: string
@@ -6,11 +8,11 @@ interface CategoryBadgeProps {
 }
 
 export function CategoryBadge({ name, color }: CategoryBadgeProps) {
-  const style = getCategoryBadgeStyle(color)
+  const theme = useTheme()
 
   return (
-    <span className="category-badge" style={style}>
+    <Box component="span" sx={getCategoryBadgeSx(color, theme)}>
       {name}
-    </span>
+    </Box>
   )
 }

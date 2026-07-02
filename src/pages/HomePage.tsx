@@ -1,3 +1,9 @@
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
+import Stack from '@mui/material/Stack'
+import Typography from '@mui/material/Typography'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCategories } from '../api/categories'
 import {
@@ -10,12 +16,13 @@ import {
   uploadExcelFile,
   uploadOzonFile,
 } from '../api/operations'
+import { TagsIcon } from '../assets/icons/TagsIcon'
 import { AddOperationModal } from '../components/AddOperationModal'
 import { CategoryManagerModal } from '../components/CategoryManagerModal'
 import { ImportPreviewModal } from '../components/ImportPreviewModal'
 import { ImportUploadSection } from '../components/ImportUploadSection'
 import { OperationsTable } from '../components/OperationsTable'
-import { PeriodFilter } from '../components/PeriodFilter'
+import { PeriodSelect } from '../components/PeriodSelect'
 import type { Category } from '../types/category'
 import type { GroupedExpense, GroupedPreviewOperation } from '../types/expense'
 import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
@@ -26,7 +33,6 @@ import {
   getMonthsForYear,
   type OperationPeriod,
 } from '../utils/operationPeriods'
-import './HomePage.css'
 
 interface ImportPreview {
   fileName: string
@@ -122,15 +128,6 @@ export function HomePage() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    document.body.style.overflow =
-      preview || categoryManagerOpen || addOperationOpen ? 'hidden' : ''
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [preview, categoryManagerOpen, addOperationOpen])
 
   async function handleImportFile(
     file: File,
@@ -274,89 +271,101 @@ export function HomePage() {
   }
 
   return (
-    <div className="home-page">
-      <header className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1>Главная</h1>
-            <p>
-              Загрузите Excel-отчёт или выгрузку Ozon, назначьте категории операциям
-              и сохраните сгруппированные данные.
-            </p>
-          </div>
-          <div className="page-header-actions">
-            <button
-              type="button"
-              className="header-action-btn"
-              onClick={() => setCategoryManagerOpen(true)}
-              disabled={initialLoading || saving || preview !== null}
-            >
-              Категории
-            </button>
-            {import.meta.env.DEV && (
-              <button
-                type="button"
-                className="dev-clear-btn"
-                onClick={() => void handleClearAll()}
-                disabled={clearing || initialLoading || saving || preview !== null}
-                title="Только для тестирования"
-              >
-                {clearing ? 'Очистка…' : 'Очистить БД'}
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+    <Stack spacing={3}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Button
+          variant="contained"
+          color="secondary"
+          size="large"
+          startIcon={<TagsIcon size={20} strokeWidth={2} />}
+          disabled={initialLoading || saving || preview !== null}
+          onClick={() => setCategoryManagerOpen(true)}
+          sx={{
+            fontWeight: 600,
+            px: 2.5,
+            boxShadow: 2,
+            '&:hover': { boxShadow: 4 },
+          }}
+        >
+          Настроить категории
+        </Button>
 
-      <main className="page-main">
-        <ImportUploadSection
-          disabled={
-            parsing ||
-            saving ||
-            initialLoading ||
-            preview !== null ||
-            addOperationOpen
-          }
-          onExcelFileSelect={(file) => void handleExcelFileSelect(file)}
-          onOzonFileSelect={(file) => void handleOzonFileSelect(file)}
-          onAddOperation={() => setAddOperationOpen(true)}
-        />
-
-        {initialLoading && (
-          <p className="status status-loading">Загрузка сохранённых данных…</p>
+        {import.meta.env.DEV && (
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => void handleClearAll()}
+            disabled={clearing || initialLoading || saving || preview !== null}
+            title="Только для тестирования"
+          >
+            {clearing ? 'Очистка…' : 'Очистить БД'}
+          </Button>
         )}
+      </Box>
 
-        {parsing && <p className="status status-loading">Обработка файла…</p>}
+      <ImportUploadSection
+        disabled={
+          parsing ||
+          saving ||
+          initialLoading ||
+          preview !== null ||
+          addOperationOpen
+        }
+        onExcelFileSelect={(file) => void handleExcelFileSelect(file)}
+        onOzonFileSelect={(file) => void handleOzonFileSelect(file)}
+        onAddOperation={() => setAddOperationOpen(true)}
+      />
 
-        {fileName && !parsing && !initialLoading && operations.length > 0 && (
-          <p className="status status-success">
-            Последний сохранённый файл: <strong>{fileName}</strong>
-          </p>
-        )}
+      {initialLoading && (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <CircularProgress size={18} />
+          <Typography color="text.secondary">Загрузка сохранённых данных…</Typography>
+        </Stack>
+      )}
 
-        {error && <p className="status status-error">{error}</p>}
+      {parsing && (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <CircularProgress size={18} />
+          <Typography color="text.secondary">Обработка файла…</Typography>
+        </Stack>
+      )}
 
-        <section className="home-operations-section">
-          {!initialLoading && operations.length > 0 && selectedPeriod !== null && (
-            <PeriodFilter
-              operations={operations}
-              selectedPeriod={selectedPeriod}
-              onPeriodChange={setSelectedPeriod}
-            />
-          )}
+      {fileName && !parsing && !initialLoading && operations.length > 0 && (
+        <Alert severity="success">
+          Последний сохранённый файл: <strong>{fileName}</strong>
+        </Alert>
+      )}
 
-          <OperationsTable
-            operations={filteredOperations}
-            loading={initialLoading}
-            categoryColors={categoryColors}
-            emptyMessage={
-              operations.length > 0
-                ? 'Нет операций за выбранный период. Выберите другой месяц или год.'
-                : 'Сохранённые операции появятся здесь после подтверждения загрузки файла.'
-            }
+      {error && <Alert severity="error">{error}</Alert>}
+
+      <Stack spacing={2}>
+        {!initialLoading && operations.length > 0 && selectedPeriod !== null && (
+          <PeriodSelect
+            operations={operations}
+            value={selectedPeriod}
+            onChange={setSelectedPeriod}
           />
-        </section>
-      </main>
+        )}
+
+        <OperationsTable
+          operations={filteredOperations}
+          loading={initialLoading}
+          categoryColors={categoryColors}
+          emptyMessage={
+            operations.length > 0
+              ? 'Нет операций за выбранный период. Выберите другой месяц или год.'
+              : 'Сохранённые операции появятся здесь после подтверждения загрузки файла.'
+          }
+        />
+      </Stack>
 
       {categoryManagerOpen && (
         <CategoryManagerModal
@@ -395,6 +404,6 @@ export function HomePage() {
           onCancel={handleCancelPreview}
         />
       )}
-    </div>
+    </Stack>
   )
 }

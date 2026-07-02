@@ -1,3 +1,4 @@
+import type { SxProps, Theme } from '@mui/material/styles'
 import type { Category } from '../types/category'
 
 export function buildCategoryColorMap(
@@ -34,27 +35,57 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   }
 }
 
-export function getCategoryBadgeStyle(color: string | undefined): {
+export function getCategoryBadgeStyle(
+  color: string | undefined,
+  fallback?: { bg: string; fg: string },
+): {
   background: string
   color: string
 } {
   if (!color) {
     return {
-      background: 'var(--accent-bg)',
-      color: 'var(--accent)',
+      background: fallback?.bg ?? 'rgba(25, 118, 210, 0.15)',
+      color: fallback?.fg ?? '#1976d2',
     }
   }
 
   const rgb = hexToRgb(color)
   if (!rgb) {
     return {
-      background: 'var(--accent-bg)',
-      color: 'var(--accent)',
+      background: fallback?.bg ?? 'rgba(25, 118, 210, 0.15)',
+      color: fallback?.fg ?? '#1976d2',
     }
   }
 
   return {
     background: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`,
     color,
+  }
+}
+
+export function getCategoryBadgeSx(
+  color: string | undefined,
+  theme: Theme,
+): SxProps<Theme> {
+  const { background, color: foreground } = getCategoryBadgeStyle(color, {
+    bg: theme.palette.action.selected,
+    fg: theme.palette.primary.main,
+  })
+
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    px: 1,
+    py: 0.25,
+    borderRadius: 1,
+    border: 1,
+    borderStyle: 'solid',
+    borderColor: color ?? theme.palette.divider,
+    bgcolor: background,
+    color: foreground,
+    fontSize: theme.typography.body2.fontSize,
+    lineHeight: theme.typography.body2.lineHeight,
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
   }
 }

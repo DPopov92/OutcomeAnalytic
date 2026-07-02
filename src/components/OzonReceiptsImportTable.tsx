@@ -1,3 +1,9 @@
+import Box from '@mui/material/Box'
+import Collapse from '@mui/material/Collapse'
+import IconButton from '@mui/material/IconButton'
+import Paper from '@mui/material/Paper'
+import Stack from '@mui/material/Stack'
+import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ChevronDownIcon } from '../assets/icons/ChevronDownIcon'
 import { DeleteIcon } from '../assets/icons/DeleteIcon'
@@ -6,7 +12,6 @@ import type { Category } from '../types/category'
 import type { OzonReceipt } from '../types/ozon'
 import { ozonReceiptItemLineTotal } from '../types/ozon'
 import { CategorySelect } from './CategorySelect'
-import './OzonReceiptsImportTable.css'
 
 export const OZON_RECEIPT_OPERATION_CATEGORY = 'Ozon'
 
@@ -29,6 +34,9 @@ export interface OzonReceiptGroupState {
   removed: boolean
   items: OzonReceiptItemState[]
 }
+
+const parentGridColumns = '40px 1.4fr 0.7fr 0.9fr 1.4fr 48px'
+const childGridColumns = '2fr 0.9fr 1.4fr 48px'
 
 function buildItemDescription(name: string, quantity: number): string {
   const label = name.trim() || 'Товар'
@@ -168,6 +176,11 @@ function isParentCategoryDisabled(group: OzonReceiptGroupState): boolean {
   )
 }
 
+const removedRowSx = {
+  opacity: 0.5,
+  textDecoration: 'line-through',
+}
+
 interface OzonReceiptsImportTableProps {
   groups: OzonReceiptGroupState[]
   categories: Category[]
@@ -261,237 +274,290 @@ export function OzonReceiptsImportTable({
 
   if (groups.length === 0) {
     return (
-      <div className="table-empty">
-        <p>Нет чеков для загрузки.</p>
-      </div>
+      <Box sx={{ py: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">Нет чеков для загрузки.</Typography>
+      </Box>
     )
   }
 
   return (
-    <div className="table-section compact ozon-receipts-import-table">
-      <div className="table-header">
-        <div>
-          <h2>Чеки Ozon</h2>
-          <p className="table-period">
+    <Stack spacing={2}>
+      <Stack
+        spacing={1}
+        sx={{
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+        }}
+      >
+        <Box>
+          <Typography variant="h6" component="h2">
+            Чеки Ozon
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             Назначьте категорию всему чеку или отдельным позициям
-          </p>
-        </div>
-        <p>
+          </Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary">
           Позиций: <strong>{activeItemCount}</strong> · Сумма:{' '}
           <strong>{amountFormatter.format(totalAmount)}</strong>
-        </p>
-      </div>
+        </Typography>
+      </Stack>
 
-      <div className="table-wrapper">
-        <div className="ozon-receipt-groups">
-          <div className="ozon-receipt-parent-header" aria-hidden="true">
-          <span className="ozon-receipt-col-expand" />
-          <span className="ozon-receipt-col-date">Дата заказа</span>
-          <span className="ozon-receipt-col-positions">Позиции</span>
-          <span className="ozon-receipt-col-amount">Сумма</span>
-          <span className="ozon-receipt-col-category">Категория</span>
-          {onToggleGroupRemoved && <span className="ozon-receipt-col-actions" />}
-        </div>
+      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+        <Box
+          aria-hidden="true"
+          sx={{
+            display: { xs: 'none', md: 'grid' },
+            gridTemplateColumns: parentGridColumns,
+            gap: 1,
+            px: 1.5,
+            py: 1,
+            bgcolor: 'action.hover',
+            typography: 'caption',
+            fontWeight: 600,
+            color: 'text.secondary',
+          }}
+        >
+          <span />
+          <span>Дата заказа</span>
+          <span>Позиции</span>
+          <span>Сумма</span>
+          <span>Категория</span>
+          {onToggleGroupRemoved && <span />}
+        </Box>
 
-        {groups.map((group) => {
-          const parentDisabled = isParentCategoryDisabled(group)
-          const childrenEditable = group.userCategory.trim() === ''
-          const groupRemoved = group.removed
-          const isExpanded = !collapsedGroups.has(group.id)
-          const activeItems = group.items.filter((item) => !item.removed)
+        <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+          {groups.map((group) => {
+            const parentDisabled = isParentCategoryDisabled(group)
+            const childrenEditable = group.userCategory.trim() === ''
+            const groupRemoved = group.removed
+            const isExpanded = !collapsedGroups.has(group.id)
+            const activeItems = group.items.filter((item) => !item.removed)
 
-          return (
-            <article
-              key={group.id}
-              className={`ozon-receipt-group${
-                groupRemoved ? ' ozon-receipt-group-removed' : ''
-              }${isExpanded ? ' ozon-receipt-group-expanded' : ''}`}
-            >
-              <div
-                className={`ozon-receipt-parent-row${
-                  groupRemoved ? ' import-preview-row-removed' : ''
-                }`}
-              >
-                <div className="ozon-receipt-col-expand">
-                  <button
-                    type="button"
-                    className="ozon-receipt-expand-btn"
-                    aria-expanded={isExpanded}
-                    aria-label={
-                      isExpanded
-                        ? `Свернуть чек от ${formatDate(group.date)}`
-                        : `Развернуть чек от ${formatDate(group.date)}`
-                    }
-                    title={isExpanded ? 'Свернуть позиции' : 'Развернуть позиции'}
-                    onClick={() => toggleGroupExpanded(group.id)}
-                  >
-                    <ChevronDownIcon
-                      className={isExpanded ? 'expanded' : undefined}
-                      size={16}
-                      strokeWidth={2}
-                    />
-                  </button>
-                </div>
-
-                <div className="ozon-receipt-col-date">
-                  <span className="ozon-receipt-parent-label">Дата заказа</span>
-                  <span className="ozon-receipt-parent-value">{formatDate(group.date)}</span>
-                </div>
-
-                <div className="ozon-receipt-col-positions">
-                  <span className="ozon-receipt-parent-label">Позиции</span>
-                  <span className="ozon-receipt-parent-value">{group.items.length}</span>
-                </div>
-
-                <div className="ozon-receipt-col-amount">
-                  <span className="ozon-receipt-parent-label">Сумма</span>
-                  <span className="ozon-receipt-parent-value">
-                    {amountFormatter.format(group.totalAmount)}
-                  </span>
-                </div>
-
-                <div className="ozon-receipt-col-category">
-                  <span className="ozon-receipt-parent-label">Категория</span>
-                  {!groupRemoved && (
-                    <CategorySelect
-                      value={group.userCategory}
-                      categories={categories}
-                      categoryColors={categoryColors}
-                      disabled={parentDisabled}
-                      clearable
-                      hasError={
-                        highlightMissingCategories &&
-                        !parentDisabled &&
-                        !group.userCategory.trim() &&
-                        group.items.some(
-                          (item) => !item.removed && !item.userCategory.trim(),
-                        )
-                      }
-                      onChange={(userCategory) =>
-                        handleParentCategoryChange(group.id, userCategory)
-                      }
-                    />
-                  )}
-                </div>
-
-                {onToggleGroupRemoved && (
-                  <div className="ozon-receipt-col-actions">
-                    <button
-                      type="button"
-                      className={groupRemoved ? 'row-restore-btn' : 'row-delete-btn'}
-                      onClick={() => onToggleGroupRemoved(group.id)}
+            return (
+              <Box key={group.id} sx={groupRemoved ? removedRowSx : undefined}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: parentGridColumns },
+                    gap: 1,
+                    alignItems: 'center',
+                    p: 1.5,
+                  }}
+                >
+                  <Box>
+                    <IconButton
+                      size="small"
+                      aria-expanded={isExpanded}
                       aria-label={
-                        groupRemoved
-                          ? `Вернуть чек от ${formatDate(group.date)}`
-                          : `Исключить чек от ${formatDate(group.date)}`
+                        isExpanded
+                          ? `Свернуть чек от ${formatDate(group.date)}`
+                          : `Развернуть чек от ${formatDate(group.date)}`
                       }
-                      title={groupRemoved ? 'Вернуть чек' : 'Исключить чек'}
+                      title={isExpanded ? 'Свернуть позиции' : 'Развернуть позиции'}
+                      onClick={() => toggleGroupExpanded(group.id)}
                     >
-                      {groupRemoved ? (
-                        <RestoreIcon size={16} strokeWidth={2} />
-                      ) : (
-                        <DeleteIcon size={16} strokeWidth={2} />
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <ChevronDownIcon
+                        size={16}
+                        strokeWidth={2}
+                        style={{
+                          transform: isExpanded ? 'rotate(180deg)' : undefined,
+                          transition: 'transform 0.2s',
+                        }}
+                      />
+                    </IconButton>
+                  </Box>
 
-              {isExpanded && (
-                <div className="ozon-receipt-children">
-                  <div className="ozon-receipt-child-header" aria-hidden="true">
-                    <span className="ozon-receipt-col-description">Описание</span>
-                    <span className="ozon-receipt-col-amount">Сумма</span>
-                    <span className="ozon-receipt-col-category">Категория</span>
-                    {onToggleItemRemoved && <span className="ozon-receipt-col-actions" />}
-                  </div>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                      Дата заказа
+                    </Typography>
+                    <Typography variant="body2">{formatDate(group.date)}</Typography>
+                  </Box>
 
-                  {group.items.length === 0 ? (
-                    <p className="ozon-receipt-children-empty">В чеке нет позиций.</p>
-                  ) : (
-                    group.items.map((item) => {
-                      const itemRemoved = groupRemoved || item.removed
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                      Позиции
+                    </Typography>
+                    <Typography variant="body2">{group.items.length}</Typography>
+                  </Box>
 
-                      return (
-                        <div
-                          key={item.id}
-                          className={`ozon-receipt-child-row${
-                            itemRemoved ? ' import-preview-row-removed' : ''
-                          }`}
-                        >
-                          <div className="ozon-receipt-col-description">
-                            <span className="ozon-receipt-child-label">Описание</span>
-                            <span className="ozon-receipt-child-value">
-                              {formatItemDescription(item.description)}
-                            </span>
-                          </div>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                      Сумма
+                    </Typography>
+                    <Typography variant="body2">{amountFormatter.format(group.totalAmount)}</Typography>
+                  </Box>
 
-                          <div className="ozon-receipt-col-amount">
-                            <span className="ozon-receipt-child-label">Сумма</span>
-                            <span className="ozon-receipt-child-value">
-                              {amountFormatter.format(item.amount)}
-                            </span>
-                          </div>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                      Категория
+                    </Typography>
+                    {!groupRemoved && (
+                      <CategorySelect
+                        value={group.userCategory}
+                        categories={categories}
+                        categoryColors={categoryColors}
+                        disabled={parentDisabled}
+                        clearable
+                        hasError={
+                          highlightMissingCategories &&
+                          !parentDisabled &&
+                          !group.userCategory.trim() &&
+                          group.items.some(
+                            (item) => !item.removed && !item.userCategory.trim(),
+                          )
+                        }
+                        onChange={(userCategory) =>
+                          handleParentCategoryChange(group.id, userCategory)
+                        }
+                      />
+                    )}
+                  </Box>
 
-                          <div className="ozon-receipt-col-category">
-                            <span className="ozon-receipt-child-label">Категория</span>
-                            {!itemRemoved && (
-                              <CategorySelect
-                                value={item.userCategory}
-                                categories={categories}
-                                categoryColors={categoryColors}
-                                disabled={!childrenEditable}
-                                clearable
-                                hasError={
-                                  highlightMissingCategories && !item.userCategory.trim()
-                                }
-                                onChange={(userCategory) =>
-                                  handleChildCategoryChange(group.id, item.id, userCategory)
-                                }
-                              />
+                  {onToggleGroupRemoved && (
+                    <Box sx={{ justifySelf: { md: 'center' } }}>
+                      <IconButton
+                        size="small"
+                        color={groupRemoved ? 'default' : 'error'}
+                        onClick={() => onToggleGroupRemoved(group.id)}
+                        aria-label={
+                          groupRemoved
+                            ? `Вернуть чек от ${formatDate(group.date)}`
+                            : `Исключить чек от ${formatDate(group.date)}`
+                        }
+                        title={groupRemoved ? 'Вернуть чек' : 'Исключить чек'}
+                      >
+                        {groupRemoved ? (
+                          <RestoreIcon size={16} strokeWidth={2} />
+                        ) : (
+                          <DeleteIcon size={16} strokeWidth={2} />
+                        )}
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+
+                <Collapse in={isExpanded}>
+                  <Box sx={{ bgcolor: 'action.hover', px: 1.5, pb: 1.5 }}>
+                    <Box
+                      aria-hidden="true"
+                      sx={{
+                        display: { xs: 'none', md: 'grid' },
+                        gridTemplateColumns: childGridColumns,
+                        gap: 1,
+                        py: 1,
+                        typography: 'caption',
+                        fontWeight: 600,
+                        color: 'text.secondary',
+                      }}
+                    >
+                      <span>Описание</span>
+                      <span>Сумма</span>
+                      <span>Категория</span>
+                      {onToggleItemRemoved && <span />}
+                    </Box>
+
+                    {group.items.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                        В чеке нет позиций.
+                      </Typography>
+                    ) : (
+                      group.items.map((item) => {
+                        const itemRemoved = groupRemoved || item.removed
+
+                        return (
+                          <Box
+                            key={item.id}
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: { xs: '1fr', md: childGridColumns },
+                              gap: 1,
+                              alignItems: 'center',
+                              py: 1,
+                              borderTop: 1,
+                              borderColor: 'divider',
+                              ...(itemRemoved ? removedRowSx : undefined),
+                            }}
+                          >
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                                Описание
+                              </Typography>
+                              <Typography variant="body2">
+                                {formatItemDescription(item.description)}
+                              </Typography>
+                            </Box>
+
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                                Сумма
+                              </Typography>
+                              <Typography variant="body2">{amountFormatter.format(item.amount)}</Typography>
+                            </Box>
+
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                                Категория
+                              </Typography>
+                              {!itemRemoved && (
+                                <CategorySelect
+                                  value={item.userCategory}
+                                  categories={categories}
+                                  categoryColors={categoryColors}
+                                  disabled={!childrenEditable}
+                                  clearable
+                                  hasError={
+                                    highlightMissingCategories && !item.userCategory.trim()
+                                  }
+                                  onChange={(userCategory) =>
+                                    handleChildCategoryChange(group.id, item.id, userCategory)
+                                  }
+                                />
+                              )}
+                            </Box>
+
+                            {onToggleItemRemoved && (
+                              <Box sx={{ justifySelf: { md: 'center' } }}>
+                                <IconButton
+                                  size="small"
+                                  color={itemRemoved ? 'default' : 'error'}
+                                  onClick={() => onToggleItemRemoved(group.id, item.id)}
+                                  disabled={groupRemoved}
+                                  aria-label={
+                                    itemRemoved
+                                      ? `Вернуть позицию: ${item.description}`
+                                      : `Исключить позицию: ${item.description}`
+                                  }
+                                  title={itemRemoved ? 'Вернуть позицию' : 'Исключить позицию'}
+                                >
+                                  {itemRemoved ? (
+                                    <RestoreIcon size={16} strokeWidth={2} />
+                                  ) : (
+                                    <DeleteIcon size={16} strokeWidth={2} />
+                                  )}
+                                </IconButton>
+                              </Box>
                             )}
-                          </div>
+                          </Box>
+                        )
+                      })
+                    )}
 
-                          {onToggleItemRemoved && (
-                            <div className="ozon-receipt-col-actions">
-                              <button
-                                type="button"
-                                className={itemRemoved ? 'row-restore-btn' : 'row-delete-btn'}
-                                onClick={() => onToggleItemRemoved(group.id, item.id)}
-                                disabled={groupRemoved}
-                                aria-label={
-                                  itemRemoved
-                                    ? `Вернуть позицию: ${item.description}`
-                                    : `Исключить позицию: ${item.description}`
-                                }
-                                title={itemRemoved ? 'Вернуть позицию' : 'Исключить позицию'}
-                              >
-                                {itemRemoved ? (
-                                  <RestoreIcon size={16} strokeWidth={2} />
-                                ) : (
-                                  <DeleteIcon size={16} strokeWidth={2} />
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  )}
-
-                  {!groupRemoved && activeItems.length > 0 && (
-                    <p className="ozon-receipt-children-summary">
-                      {activeItems.length}{' '}
-                      {activeItems.length === 1 ? 'позиция' : 'позиций'} в чеке
-                    </p>
-                  )}
-                </div>
-              )}
-            </article>
-          )
-        })}
-        </div>
-      </div>
-    </div>
+                    {!groupRemoved && activeItems.length > 0 && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pt: 1 }}>
+                        {activeItems.length}{' '}
+                        {activeItems.length === 1 ? 'позиция' : 'позиций'} в чеке
+                      </Typography>
+                    )}
+                  </Box>
+                </Collapse>
+              </Box>
+            )
+          })}
+        </Stack>
+      </Paper>
+    </Stack>
   )
 }

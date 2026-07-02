@@ -64,3 +64,23 @@ export function filterOperationsByPeriod(
       operation.month === period.month && operation.year === period.year,
   )
 }
+
+export function getCurrentPeriod(): OperationPeriod {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
+export function getDefaultSelectableYears(): number[] {
+  const currentYear = new Date().getFullYear()
+  const years: number[] = []
+
+  for (let year = currentYear + 1; year >= currentYear - 10; year -= 1) {
+    years.push(year)
+  }
+
+  return years
+}
+
+export function getAllMonths(): number[] {
+  return Array.from({ length: 12 }, (_, index) => 12 - index)
+}

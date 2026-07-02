@@ -1,10 +1,22 @@
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import Paper from '@mui/material/Paper'
+import Stack from '@mui/material/Stack'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { DeleteIcon } from '../assets/icons/DeleteIcon'
 import { RestoreIcon } from '../assets/icons/RestoreIcon'
 import type { Category } from '../types/category'
 import { formatPeriod } from '../types/expense'
 import { CategorySelect } from './CategorySelect'
-import './ImportPreviewTable.css'
 
 export interface PreviewOperation {
   id: string
@@ -90,10 +102,6 @@ function ImportPreviewAmountInput({
     setEditing(false)
   }
 
-  function handleChange(nextDraft: string) {
-    setDraft(nextDraft)
-  }
-
   function startEditing() {
     if (disabled) {
       return
@@ -119,30 +127,31 @@ function ImportPreviewAmountInput({
 
   if (!editing) {
     return (
-      <button
-        type="button"
-        className="import-preview-amount-display"
+      <Button
+        variant="text"
+        size="small"
         disabled={disabled}
         aria-label="Изменить сумму операции"
         onClick={startEditing}
+        sx={{ minWidth: 0, fontVariantNumeric: 'tabular-nums' }}
       >
         {amountFormatter.format(normalizedValue)}
-      </button>
+      </Button>
     )
   }
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      inputMode="decimal"
-      className="import-preview-amount-input"
+    <TextField
+      inputRef={inputRef}
+      size="small"
       value={draft}
       disabled={disabled}
       aria-label="Сумма операции"
-      onChange={(event) => handleChange(event.target.value)}
+      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+      onChange={(event) => setDraft(event.target.value)}
       onBlur={commitDraft}
       onKeyDown={handleKeyDown}
+      sx={{ width: 120 }}
     />
   )
 }
@@ -161,22 +170,31 @@ export function ImportPreviewTable({
 
   if (operations.length === 0) {
     return (
-      <div className="table-empty">
-        <p>Нет операций для загрузки.</p>
-      </div>
+      <Box sx={{ py: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">Нет операций для загрузки.</Typography>
+      </Box>
     )
   }
 
   return (
-    <div className="table-section compact import-preview-table">
-      <div className="table-header">
-        <div>
-          <h2>Операции из файла</h2>
-          <p className="table-period">
+    <Stack spacing={2}>
+      <Stack
+        spacing={1}
+        sx={{
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+        }}
+      >
+        <Box>
+          <Typography variant="h6" component="h2">
+            Операции из файла
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             Назначьте категории и при необходимости скорректируйте суммы
-          </p>
-        </div>
-        <p>
+          </Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary">
           Всего: <strong>{activeOperations.length}</strong>
           {activeOperations.length !== operations.length ? (
             <>
@@ -185,35 +203,38 @@ export function ImportPreviewTable({
             </>
           ) : null}{' '}
           · Сумма: <strong>{amountFormatter.format(total)}</strong>
-        </p>
-      </div>
+        </Typography>
+      </Stack>
 
-      <div className="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Период</th>
-              <th>Категория операции</th>
-              <th>Описание</th>
-              <th className="col-amount">Сумма</th>
-              <th>Категории</th>
-              {onToggleOperationRemoved && <th className="col-actions" aria-label="Действия" />}
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer component={Paper} variant="outlined">
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow>
+              <TableCell>Период</TableCell>
+              <TableCell>Категория операции</TableCell>
+              <TableCell>Описание</TableCell>
+              <TableCell align="right">Сумма</TableCell>
+              <TableCell>Категории</TableCell>
+              {onToggleOperationRemoved && (
+                <TableCell align="center" aria-label="Действия" />
+              )}
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {operations.map((operation) => {
               const hasUserCategory = operation.userCategory.trim().length > 0
               const isRemoved = Boolean(operation.removed)
 
               return (
-                <tr
+                <TableRow
                   key={operation.id}
-                  className={isRemoved ? 'import-preview-row-removed' : undefined}
+                  hover={!isRemoved}
+                  sx={isRemoved ? { opacity: 0.5, textDecoration: 'line-through' } : undefined}
                 >
-                  <td>{formatPeriod(operation.month, operation.year)}</td>
-                  <td>{operation.operationCategory}</td>
-                  <td>{operation.description || '—'}</td>
-                  <td className="col-amount">
+                  <TableCell>{formatPeriod(operation.month, operation.year)}</TableCell>
+                  <TableCell>{operation.operationCategory}</TableCell>
+                  <TableCell>{operation.description || '—'}</TableCell>
+                  <TableCell align="right">
                     {!isRemoved && onAmountChange ? (
                       <ImportPreviewAmountInput
                         value={operation.amount}
@@ -222,8 +243,8 @@ export function ImportPreviewTable({
                     ) : (
                       amountFormatter.format(operation.amount)
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>
                     {!isRemoved && (
                       <CategorySelect
                         value={operation.userCategory}
@@ -235,14 +256,12 @@ export function ImportPreviewTable({
                         }
                       />
                     )}
-                  </td>
+                  </TableCell>
                   {onToggleOperationRemoved && (
-                    <td className="col-actions">
-                      <button
-                        type="button"
-                        className={
-                          isRemoved ? 'row-restore-btn' : 'row-delete-btn'
-                        }
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        color={isRemoved ? 'default' : 'error'}
                         onClick={() => onToggleOperationRemoved(operation.id)}
                         aria-label={
                           isRemoved
@@ -256,15 +275,15 @@ export function ImportPreviewTable({
                         ) : (
                           <DeleteIcon size={16} strokeWidth={2} />
                         )}
-                      </button>
-                    </td>
+                      </IconButton>
+                    </TableCell>
                   )}
-                </tr>
+                </TableRow>
               )
             })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Stack>
   )
 }

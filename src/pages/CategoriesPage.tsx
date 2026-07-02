@@ -1,8 +1,13 @@
+import Alert from '@mui/material/Alert'
+import CircularProgress from '@mui/material/CircularProgress'
+import Paper from '@mui/material/Paper'
+import Stack from '@mui/material/Stack'
+import Typography from '@mui/material/Typography'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCategories } from '../api/categories'
 import { fetchOperations, mapOperationDto } from '../api/operations'
 import { CategoryPieChart } from '../components/CategoryPieChart'
-import { PeriodFilter } from '../components/PeriodFilter'
+import { PeriodSelect } from '../components/PeriodSelect'
 import type { Category } from '../types/category'
 import type { GroupedExpense } from '../types/expense'
 import { aggregateCategoryTotals } from '../utils/aggregateByCategory'
@@ -12,7 +17,6 @@ import {
   getLatestPeriod,
   type OperationPeriod,
 } from '../utils/operationPeriods'
-import './CategoriesPage.css'
 
 export function CategoriesPage() {
   const [operations, setOperations] = useState<GroupedExpense[]>([])
@@ -82,55 +86,51 @@ export function CategoriesPage() {
   }, [])
 
   return (
-    <div className="categories-page">
-      <header className="categories-page-header">
-        <h1>По категориям</h1>
-        <p>Доля расходов по каждой категории за выбранный месяц.</p>
-      </header>
-
+    <Stack spacing={3}>
       {loading && (
-        <p className="categories-page-status categories-page-status-loading">
-          Загрузка данных…
-        </p>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <CircularProgress size={18} />
+          <Typography color="text.secondary">Загрузка данных…</Typography>
+        </Stack>
       )}
 
-      {error && (
-        <p className="categories-page-status categories-page-status-error">{error}</p>
-      )}
+      {error && <Alert severity="error">{error}</Alert>}
 
       {!loading && !error && operations.length === 0 && (
-        <div className="categories-page-empty">
-          <p className="categories-page-empty-title">Нет данных для диаграммы</p>
-          <p className="categories-page-empty-text">
+        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Нет данных для диаграммы
+          </Typography>
+          <Typography color="text.secondary">
             Загрузите и сохраните операции на главной странице — здесь появится
             распределение расходов по категориям.
-          </p>
-        </div>
+          </Typography>
+        </Paper>
       )}
 
       {!loading && !error && operations.length > 0 && selectedPeriod !== null && (
-        <section className="categories-chart-section">
-          <PeriodFilter
+        <Stack spacing={2}>
+          <PeriodSelect
             operations={operations}
-            selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
+            value={selectedPeriod}
+            onChange={setSelectedPeriod}
           />
 
           {categoryTotals.length === 0 ? (
-            <div className="categories-page-empty categories-page-empty-period">
-              <p className="categories-page-empty-title">
+            <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="h6" gutterBottom>
                 Нет данных за выбранный период
-              </p>
-              <p className="categories-page-empty-text">
+              </Typography>
+              <Typography color="text.secondary">
                 Выберите другой месяц или год — для этого периода операции не
                 найдены.
-              </p>
-            </div>
+              </Typography>
+            </Paper>
           ) : (
             <CategoryPieChart items={categoryTotals} />
           )}
-        </section>
+        </Stack>
       )}
-    </div>
+    </Stack>
   )
 }

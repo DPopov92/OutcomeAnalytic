@@ -1,7 +1,17 @@
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import Stack from '@mui/material/Stack'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import Typography from '@mui/material/Typography'
 import type { GroupedExpense } from '../types/expense'
 import { formatPeriod } from '../types/expense'
-import { CategoryBadge } from './CategoryBadge'
 import { resolveCategoryColor } from '../utils/categoryColors'
+import { CategoryBadge } from './CategoryBadge'
 
 interface OperationsTableProps {
   operations: GroupedExpense[]
@@ -32,49 +42,56 @@ export function OperationsTable({
 
   if (operations.length === 0) {
     return (
-      <div className="table-empty">
-        <p>{emptyMessage}</p>
-      </div>
+      <Box sx={{ py: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">{emptyMessage}</Typography>
+      </Box>
     )
   }
 
   return (
-    <div className="table-section">
-      <div className="table-header">
-        <div>
-          <h2>{title}</h2>
-        </div>
-        <p>
+    <Stack spacing={2}>
+      <Stack
+        spacing={1}
+        sx={{
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+        }}
+      >
+        <Typography variant="h6" component="h2">
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
           Всего: <strong>{operations.length}</strong> · Сумма:{' '}
           <strong>{amountFormatter.format(total)}</strong>
-        </p>
-      </div>
+        </Typography>
+      </Stack>
 
-      <div className="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Период</th>
-              <th>Категория</th>
-              <th className="col-amount">Сумма</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer component={Paper} variant="outlined">
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Период</TableCell>
+              <TableCell>Категория</TableCell>
+              <TableCell align="right">Сумма</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {operations.map((operation) => (
-              <tr key={operation.id}>
-                <td>{formatPeriod(operation.month, operation.year)}</td>
-                <td>
+              <TableRow key={operation.id} hover>
+                <TableCell>{formatPeriod(operation.month, operation.year)}</TableCell>
+                <TableCell>
                   <CategoryBadge
                     name={operation.category}
                     color={resolveCategoryColor(operation.category, categoryColors)}
                   />
-                </td>
-                <td className="col-amount">{amountFormatter.format(operation.amount)}</td>
-              </tr>
+                </TableCell>
+                <TableCell align="right">{amountFormatter.format(operation.amount)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Stack>
   )
 }

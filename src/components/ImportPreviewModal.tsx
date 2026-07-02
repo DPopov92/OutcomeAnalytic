@@ -1,6 +1,18 @@
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import IconButton from '@mui/material/IconButton'
+import Typography from '@mui/material/Typography'
 import { useEffect, useState } from 'react'
 import { fetchCategoryMappings } from '../api/categoryMappings'
-import { buildMappingKey } from '../types/expense'
+import type { Category } from '../types/category'
+import { buildMappingKey, type CategoryMappingInput, type GroupedPreviewOperation } from '../types/expense'
+import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
 import { ImportPreviewTable, type PreviewOperation } from './ImportPreviewTable'
 import {
   OzonReceiptsImportTable,
@@ -11,10 +23,6 @@ import {
   type OzonReceiptGroupState,
 } from './OzonReceiptsImportTable'
 import { OzonOrdersPreview } from './OzonOrdersPreview'
-import type { CategoryMappingInput, GroupedPreviewOperation } from '../types/expense'
-import type { Category } from '../types/category'
-import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
-import './ImportPreviewModal.css'
 
 function buildEditableOperations(rows: GroupedPreviewOperation[]): PreviewOperation[] {
   return rows.map((row) => ({
@@ -336,108 +344,100 @@ export function ImportPreviewModal({
     : activeOperations.length > 0
 
   return (
-    <div className="modal-overlay" onClick={saving ? undefined : onCancel}>
-      <div
-        className="modal-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="import-preview-title"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog open fullWidth maxWidth="lg" onClose={saving ? undefined : onCancel}>
+      <DialogTitle
+        id="import-preview-title"
+        sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}
       >
-        <header className="modal-header">
-          <div>
-            <h2 id="import-preview-title">Подтверждение загрузки</h2>
-            <p className="modal-subtitle">
-              {isReceiptsImport ? (
-                <>
-                  Назначьте категории позициям из чеков Ozon в файле{' '}
-                  <strong>{fileName}</strong> перед сохранением.
-                </>
-              ) : (
-                <>
-                  Назначьте категории сгруппированным операциям из файла{' '}
-                  <strong>{fileName}</strong> перед сохранением.
-                </>
-              )}
-            </p>
-            <p className="modal-subtitle">
-              Загружено новых операций: <strong>{inserted}</strong>
-              {skipped > 0 ? (
-                <>
-                  {' '}
-                  · Пропущено дубликатов: <strong>{skipped}</strong>
-                </>
-              ) : null}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onCancel}
-            disabled={saving}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
-        </header>
+        <Box>
+          <Typography variant="h6" component="span">
+            Подтверждение загрузки
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {isReceiptsImport ? (
+              <>
+                Назначьте категории позициям из чеков Ozon в файле{' '}
+                <strong>{fileName}</strong> перед сохранением.
+              </>
+            ) : (
+              <>
+                Назначьте категории сгруппированным операциям из файла{' '}
+                <strong>{fileName}</strong> перед сохранением.
+              </>
+            )}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Загружено новых операций: <strong>{inserted}</strong>
+            {skipped > 0 ? (
+              <>
+                {' '}
+                · Пропущено дубликатов: <strong>{skipped}</strong>
+              </>
+            ) : null}
+          </Typography>
+        </Box>
+        <IconButton aria-label="Закрыть" disabled={saving} onClick={onCancel} sx={{ mt: -0.5 }}>
+          ×
+        </IconButton>
+      </DialogTitle>
 
-        <div className="modal-body">
-          {mappingsLoading && (
-            <p className="status status-loading">Загрузка сохранённых связей категорий…</p>
-          )}
+      <DialogContent dividers sx={{ overflow: 'auto' }}>
+        {mappingsLoading && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <CircularProgress size={18} />
+            <Typography variant="body2" color="text.secondary">
+              Загрузка сохранённых связей категорий…
+            </Typography>
+          </Box>
+        )}
 
-          {validationError && (
-            <p className="import-preview-warning">{validationError}</p>
-          )}
+        {validationError && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {validationError}
+          </Alert>
+        )}
 
-          {isReceiptsImport ? (
-            <OzonReceiptsImportTable
-              groups={receiptGroups}
+        {isReceiptsImport ? (
+          <OzonReceiptsImportTable
+            groups={receiptGroups}
+            categories={categories}
+            categoryColors={categoryColors}
+            highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
+            onGroupsChange={handleReceiptGroupsChange}
+            onToggleGroupRemoved={saving ? undefined : handleToggleReceiptGroupRemoved}
+            onToggleItemRemoved={saving ? undefined : handleToggleReceiptItemRemoved}
+          />
+        ) : (
+          <>
+            {ozonOrders && ozonOrders.length > 0 && (
+              <OzonOrdersPreview orders={ozonOrders} />
+            )}
+
+            <ImportPreviewTable
+              operations={editableOperations}
               categories={categories}
               categoryColors={categoryColors}
               highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
-              onGroupsChange={handleReceiptGroupsChange}
-              onToggleGroupRemoved={saving ? undefined : handleToggleReceiptGroupRemoved}
-              onToggleItemRemoved={saving ? undefined : handleToggleReceiptItemRemoved}
+              onUserCategoryChange={handleUserCategoryChange}
+              onAmountChange={saving ? undefined : handleAmountChange}
+              onToggleOperationRemoved={saving ? undefined : handleToggleOperationRemoved}
             />
-          ) : (
-            <>
-              {ozonOrders && ozonOrders.length > 0 && (
-                <OzonOrdersPreview orders={ozonOrders} />
-              )}
+          </>
+        )}
+      </DialogContent>
 
-              <ImportPreviewTable
-                operations={editableOperations}
-                categories={categories}
-                categoryColors={categoryColors}
-                highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
-                onUserCategoryChange={handleUserCategoryChange}
-                onAmountChange={saving ? undefined : handleAmountChange}
-                onToggleOperationRemoved={saving ? undefined : handleToggleOperationRemoved}
-              />
-            </>
-          )}
-        </div>
-
-        <footer className="modal-footer">
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={onCancel}
-            disabled={saving}
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={handleSave}
-            disabled={saving || !canSave || mappingsLoading}
-          >
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
-        </footer>
-      </div>
-    </div>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button variant="outlined" onClick={onCancel} disabled={saving}>
+          Отмена
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={saving || !canSave || mappingsLoading}
+        >
+          {saving ? 'Сохранение…' : 'Сохранить'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }

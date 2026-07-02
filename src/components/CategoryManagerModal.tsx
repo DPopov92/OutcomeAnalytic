@@ -1,20 +1,31 @@
-import { useEffect, useState } from 'react'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import IconButton from '@mui/material/IconButton'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import Stack from '@mui/material/Stack'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
+import { useState } from 'react'
 import {
   createCategory,
   deleteCategory,
   updateCategory,
 } from '../api/categories'
-import type { Category, CategoryInput } from '../types/category'
-import { CategoryBadge } from './CategoryBadge'
-import { CategoryColorPicker } from './CategoryColorPicker'
-import { DEFAULT_CATEGORY_COLOR } from '../constants/categoryPresetColors'
 import { AddIcon } from '../assets/icons/AddIcon'
 import { CancelIcon } from '../assets/icons/CancelIcon'
 import { DeleteIcon } from '../assets/icons/DeleteIcon'
 import { EditIcon } from '../assets/icons/EditIcon'
 import { SaveIcon } from '../assets/icons/SaveIcon'
-import './CategoryManagerModal.css'
-import './ImportPreviewModal.css'
+import { DEFAULT_CATEGORY_COLOR } from '../constants/categoryPresetColors'
+import type { Category, CategoryInput } from '../types/category'
+import { CategoryBadge } from './CategoryBadge'
+import { CategoryColorPicker } from './CategoryColorPicker'
 
 const DEFAULT_COLOR = DEFAULT_CATEGORY_COLOR
 
@@ -42,14 +53,6 @@ export function CategoryManagerModal({
   const [editState, setEditState] = useState<EditState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [])
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
@@ -135,9 +138,7 @@ export function CategoryManagerModal({
   }
 
   async function handleDelete(category: Category) {
-    if (
-      !window.confirm(`Удалить категорию «${category.name}»?`)
-    ) {
+    if (!window.confirm(`Удалить категорию «${category.name}»?`)) {
       return
     }
 
@@ -159,163 +160,147 @@ export function CategoryManagerModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
-      <div
-        className="modal-dialog category-manager-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="category-manager-title"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog open fullWidth maxWidth="sm" onClose={busy ? undefined : onClose}>
+      <DialogTitle
+        id="category-manager-title"
+        sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}
       >
-        <header className="modal-header">
-          <div>
-            <h2 id="category-manager-title">Категории</h2>
-            <p className="modal-subtitle">
-              Настройте названия и цвета категорий для отображения в таблице на главном экране.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
+        <Box>
+          <Typography variant="h6" component="span">
+            Категории
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Настройте названия и цвета категорий для отображения в таблице на главном экране.
+          </Typography>
+        </Box>
+        <IconButton aria-label="Закрыть" disabled={busy} onClick={onClose} sx={{ mt: -0.5 }}>
+          ×
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent dividers>
+        <Box
+          component="form"
+          onSubmit={(event) => void handleCreate(event)}
+          sx={{ display: 'flex', flexDirection: 'row', gap: 1, alignItems: 'center', mb: 2 }}
+        >
+          <TextField
+            size="small"
+            value={newName}
+            placeholder="Название категории"
             disabled={busy}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
-        </header>
-
-        <div className="modal-body category-manager-body">
-          <form className="category-form" onSubmit={(event) => void handleCreate(event)}>
-            <label className="category-field category-field-name">
-              <span className="visually-hidden">Название</span>
-              <input
-                type="text"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                placeholder="Название категории"
-                disabled={busy}
-                maxLength={80}
-              />
-            </label>
-
-            <CategoryColorPicker
-              value={newColor}
-              onChange={setNewColor}
-              disabled={busy}
-            />
-
-            <button
-              type="submit"
-              className="category-add-btn"
-              disabled={busy}
-              aria-label="Добавить категорию"
-              title="Добавить категорию"
-            >
-              <AddIcon size={20} strokeWidth={2.5} />
-            </button>
-          </form>
-
-          {error && <p className="category-error">{error}</p>}
-
-          {categories.length === 0 ? (
-            <p className="category-empty">Категории пока не созданы.</p>
-          ) : (
-            <ul className="category-list">
-              {categories.map((category) => (
-                <li key={category.id} className="category-list-item">
-                  {editState?.id === category.id ? (
-                    <div className="category-edit-row">
-                      <label className="category-field category-field-name">
-                        <span className="visually-hidden">Название</span>
-                        <input
-                          type="text"
-                          value={editState.name}
-                          onChange={(event) =>
-                            setEditState({ ...editState, name: event.target.value })
-                          }
-                          placeholder="Название категории"
-                          disabled={busy}
-                          maxLength={80}
-                        />
-                      </label>
-
-                      <CategoryColorPicker
-                        value={editState.color}
-                        onChange={(color) =>
-                          setEditState({ ...editState, color })
-                        }
-                        disabled={busy}
-                      />
-
-                      <div className="category-edit-actions">
-                        <button
-                          type="button"
-                          className="category-icon-btn category-icon-btn-save"
-                          onClick={() => void handleSaveEdit()}
-                          disabled={busy}
-                          aria-label="Сохранить изменения"
-                          title="Сохранить"
-                        >
-                          <SaveIcon size={16} strokeWidth={2} />
-                        </button>
-                        <button
-                          type="button"
-                          className="category-icon-btn category-icon-btn-cancel"
-                          onClick={cancelEdit}
-                          disabled={busy}
-                          aria-label="Отменить редактирование"
-                          title="Отмена"
-                        >
-                          <CancelIcon size={16} strokeWidth={2} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="category-view-row">
-                      <CategoryBadge name={category.name} color={category.color} />
-                      <span className="category-color-code">{category.color}</span>
-                      <div className="category-row-actions">
-                        <button
-                          type="button"
-                          className="category-icon-btn category-icon-btn-edit"
-                          onClick={() => startEdit(category)}
-                          disabled={busy}
-                          aria-label={`Изменить категорию «${category.name}»`}
-                          title="Изменить"
-                        >
-                          <EditIcon size={16} strokeWidth={2} />
-                        </button>
-                        <button
-                          type="button"
-                          className="category-icon-btn category-icon-btn-delete"
-                          onClick={() => void handleDelete(category)}
-                          disabled={busy}
-                          aria-label={`Удалить категорию «${category.name}»`}
-                          title="Удалить"
-                        >
-                          <DeleteIcon size={16} strokeWidth={2} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <footer className="modal-footer">
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={onClose}
+            slotProps={{ htmlInput: { maxLength: 80, 'aria-label': 'Название категории' } }}
+            onChange={(event) => setNewName(event.target.value)}
+            sx={{ flex: 1 }}
+          />
+          <CategoryColorPicker value={newColor} onChange={setNewColor} disabled={busy} />
+          <IconButton
+            type="submit"
+            color="primary"
             disabled={busy}
+            aria-label="Добавить категорию"
+            title="Добавить категорию"
           >
-            Закрыть
-          </button>
-        </footer>
-      </div>
-    </div>
+            <AddIcon size={20} strokeWidth={2.5} />
+          </IconButton>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {categories.length === 0 ? (
+          <Typography color="text.secondary">Категории пока не созданы.</Typography>
+        ) : (
+          <List disablePadding>
+            {categories.map((category) => (
+              <ListItem
+                key={category.id}
+                disableGutters
+                sx={{
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  py: 1,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                }}
+              >
+                {editState?.id === category.id ? (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: '100%' }}>
+                    <TextField
+                      size="small"
+                      value={editState.name}
+                      placeholder="Название категории"
+                      disabled={busy}
+                      slotProps={{ htmlInput: { maxLength: 80, 'aria-label': 'Название категории' } }}
+                      onChange={(event) =>
+                        setEditState({ ...editState, name: event.target.value })
+                      }
+                      sx={{ flex: 1 }}
+                    />
+                    <CategoryColorPicker
+                      value={editState.color}
+                      onChange={(color) => setEditState({ ...editState, color })}
+                      disabled={busy}
+                    />
+                    <IconButton
+                      color="primary"
+                      disabled={busy}
+                      aria-label="Сохранить изменения"
+                      title="Сохранить"
+                      onClick={() => void handleSaveEdit()}
+                    >
+                      <SaveIcon size={16} strokeWidth={2} />
+                    </IconButton>
+                    <IconButton
+                      disabled={busy}
+                      aria-label="Отменить редактирование"
+                      title="Отмена"
+                      onClick={cancelEdit}
+                    >
+                      <CancelIcon size={16} strokeWidth={2} />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: '100%' }}>
+                    <CategoryBadge name={category.name} color={category.color} />
+                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                      {category.color}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      disabled={busy}
+                      aria-label={`Изменить категорию «${category.name}»`}
+                      title="Изменить"
+                      onClick={() => startEdit(category)}
+                    >
+                      <EditIcon size={16} strokeWidth={2} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={busy}
+                      aria-label={`Удалить категорию «${category.name}»`}
+                      title="Удалить"
+                      onClick={() => void handleDelete(category)}
+                    >
+                      <DeleteIcon size={16} strokeWidth={2} />
+                    </IconButton>
+                  </Stack>
+                )}
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button variant="outlined" onClick={onClose} disabled={busy}>
+          Закрыть
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }

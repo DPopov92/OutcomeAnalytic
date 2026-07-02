@@ -1,7 +1,16 @@
+import Box from '@mui/material/Box'
+import Collapse from '@mui/material/Collapse'
+import Paper from '@mui/material/Paper'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ChevronDownIcon } from '../assets/icons/ChevronDownIcon'
 import type { OzonExportOrder } from '../types/ozon'
-import './OzonOrdersPreview.css'
 
 interface OzonOrdersPreviewProps {
   orders: OzonExportOrder[]
@@ -47,43 +56,64 @@ export function OzonOrdersPreview({ orders }: OzonOrdersPreviewProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
-    <section className="ozon-orders-preview">
-      <button
+    <Paper variant="outlined" sx={{ mb: 2 }}>
+      <Box
+        component="button"
         type="button"
-        className="ozon-orders-preview-toggle"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          p: 1.5,
+          border: 'none',
+          bgcolor: 'transparent',
+          cursor: 'pointer',
+          color: 'text.primary',
+          font: 'inherit',
+        }}
       >
-        <span>Исходные заказы Ozon ({orders.length})</span>
-        <ChevronDownIcon className={expanded ? 'expanded' : undefined} />
-      </button>
+        <Typography variant="subtitle2">
+          Исходные заказы Ozon ({orders.length})
+        </Typography>
+        <ChevronDownIcon
+          size={18}
+          strokeWidth={2}
+          style={{
+            transform: expanded ? 'rotate(180deg)' : undefined,
+            transition: 'transform 0.2s',
+          }}
+        />
+      </Box>
 
-      {expanded && (
-        <div className="ozon-orders-preview-table-wrap">
-          <table className="ozon-orders-preview-table">
-            <thead>
-              <tr>
-                <th>Номер</th>
-                <th>Дата</th>
-                <th>Статус</th>
-                <th>Товаров</th>
-                <th>Сумма</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Collapse in={expanded}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Номер</TableCell>
+                <TableCell>Дата</TableCell>
+                <TableCell>Статус</TableCell>
+                <TableCell>Товаров</TableCell>
+                <TableCell align="right">Сумма</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {orders.map((order) => (
-                <tr key={order.orderNumber}>
-                  <td>{order.orderNumber}</td>
-                  <td>{formatDate(order.date)}</td>
-                  <td>{formatStatus(order.status)}</td>
-                  <td>{order.items.length}</td>
-                  <td>{formatAmount(order.totalAmount)} ₽</td>
-                </tr>
+                <TableRow key={order.orderNumber} hover>
+                  <TableCell>{order.orderNumber}</TableCell>
+                  <TableCell>{formatDate(order.date)}</TableCell>
+                  <TableCell>{formatStatus(order.status)}</TableCell>
+                  <TableCell>{order.items.length}</TableCell>
+                  <TableCell align="right">{formatAmount(order.totalAmount)} ₽</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Collapse>
+    </Paper>
   )
 }
