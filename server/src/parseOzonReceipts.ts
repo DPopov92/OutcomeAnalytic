@@ -1,0 +1,156 @@
+import type { ParsedExpenseRow } from './parseExcel.js'
+import {
+  isOzonReceiptsFile,
+  receiptItemLineTotal,
+  type OzonReceipt,
+  type OzonReceiptsFile,
+} from './ozonReceiptTypes.js'
+
+export const OZON_RECEIPT_CATEGORY = 'Ozon'
+
+export interface ParseOzonReceiptsOptions {
+  splitByItems?: boolean
+}
+
+export interface ParseOzonReceiptsResult {
+  rows: ParsedExpenseRow[]
+  receiptsFile: OzonReceiptsFile
+}
+
+export function parseOzonReceiptsBuffer(
+  fileBuffer: Buffer,
+  options: ParseOzonReceiptsOptions = {},
+): ParseOzonReceiptsResult {
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(fileBuffer.toString('utf8'))
+  } catch {
+    throw new Error('Файл не похож на выгрузку чеков Ozon: некорректный JSON.')
+  }
+
+  if (!isOzonReceiptsFile(parsed)) {
+    throw new Error(
+      'Файл не похож на выгрузку чеков Ozon. Ожидается JSON с полем source: "ozon" и массивом receipts.',
+    )
+  }
+
+  return parseOzonReceiptsFile(parsed, options)
+}
+
+export function parseOzonReceiptsFile(
+  receiptsFile: OzonReceiptsFile,
+  options: ParseOzonReceiptsOptions = {},
+): ParseOzonReceiptsResult {
+  const filteredReceipts = filterReceiptsByMonth(receiptsFile.receipts, receiptsFile.month)
+
+  if (filteredReceipts.length === 0) {
+    throw new Error('В выгрузке Ozon не найдено чеков за указанный период.')
+  }
+
+  const splitByItems = options.splitByItems === true
+  const rows: ParsedExpenseRow[] = []
+
+  for (const receipt of filteredReceipts) {
+    rows.push(...mapReceiptToExpenseRows(receipt, splitByItems))
+  }
+
+  return {
+    rows: rows.sort((a, b) => b.date.getTime() - a.date.getTime()),
+    receiptsFile: {
+      ...receiptsFile,
+      receipts: filteredReceipts,
+    },
+  }
+}
+
+export function buildReceiptDescription(receipt: OzonReceipt): string {
+  const itemNames = receipt.items.map((item) => item.name.trim()).filter(Boolean)
+
+  if (itemNames.length === 0) {
+    return 'Чек Ozon'
+  }
+
+  if (itemNames.length === 1) {
+    return `Чек Ozon: ${itemNames[0]}`
+  }
+
+  const preview = itemNames.slice(0, 2).join(', ')
+  const suffix = itemNames.length > 2 ? ` и ещё ${itemNames.length - 2}` : ''
+
+  return `Чек Ozon: ${preview}${suffix}`
+}
+
+function buildItemDescription(name: string, quantity: number): string {
+  const label = name.trim() || 'Товар'
+  if (quantity > 1) {
+    return `Чек Ozon: ${label} (${quantity} шт.)`
+  }
+
+  return `Чек Ozon: ${label}`
+}
+
+function mapReceiptToExpenseRows(
+  receipt: OzonReceipt,
+  splitByItems: boolean,
+): ParsedExpenseRow[] {
+  const date = parseReceiptDate(receipt.date)
+
+  if (!date) {
+    throw new Error(`Чек от ${receipt.date}: некорректная дата.`)
+  }
+
+  if (splitByItems && receipt.items.length > 0) {
+    return receipt.items.map((item) => ({
+      date,
+      operationCategory: OZON_RECEIPT_CATEGORY,
+      description: buildItemDescription(item.name, item.quantity),
+      amount: normalizeAmount(receiptItemLineTotal(item)),
+    }))
+  }
+
+  return [
+    {
+      date,
+      operationCategory: OZON_RECEIPT_CATEGORY,
+      description: buildReceiptDescription(receipt),
+      amount: normalizeAmount(receipt.totalAmount),
+    },
+  ]
+}
+
+function filterReceiptsByMonth(receipts: OzonReceipt[], month: string | undefined): OzonReceipt[] {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return receipts
+  }
+
+  const [yearText, monthText] = month.split('-')
+  const year = Number(yearText)
+  const monthIndex = Number(monthText) - 1
+
+  return receipts.filter((receipt) => {
+    const date = parseReceiptDate(receipt.date)
+    if (!date) {
+      return false
+    }
+
+    return date.getFullYear() === year && date.getMonth() === monthIndex
+  })
+}
+
+function parseReceiptDate(value: string): Date | null {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  return parsed
+}
+
+function normalizeAmount(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0
+  }
+
+  return Math.round(value * 100) / 100
+}

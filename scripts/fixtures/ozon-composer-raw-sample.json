@@ -1,0 +1,14 @@
+{
+  "layout": [],
+  "widgetStates": {
+    "orderList-482910-default-1": "{\"orders\":[{\"number\":\"12345678-0001\",\"createdAt\":\"2026-03-15T14:30:00+03:00\",\"status\":{\"code\":\"delivered\",\"name\":\"Доставлен\"},\"totalPrice\":249900,\"products\":[{\"title\":\"Наушники XYZ\",\"quantity\":1,\"price\":249900}]},{\"number\":\"87654321-0002\",\"createdAt\":\"2026-05-20T10:15:00+03:00\",\"status\":{\"code\":\"delivered\",\"name\":\"Доставлен\"},\"totalPrice\":159050,\"products\":[{\"title\":\"Кабель USB-C\",\"quantity\":2,\"price\":39525},{\"title\":\"Чехол для телефона\",\"quantity\":1,\"price\":80000}]}],\"pagination\":{\"hasNext\":false,\"page\":1}}"
+  },
+  "browser": {},
+  "seo": {},
+  "shared": {},
+  "pageInfo": {
+    "url": "/my/orderlist/",
+    "layoutId": 12345,
+    "layoutVersion": 1
+  }
+}

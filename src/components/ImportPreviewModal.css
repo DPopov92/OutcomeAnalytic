@@ -173,6 +173,11 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-body .ozon-receipts-import-table.table-section.compact .table-wrapper {
+  margin-top: 0.25rem;
 }
 
 .import-preview-warning {

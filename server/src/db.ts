@@ -4,7 +4,9 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { groupFileOperations, buildGroupKey } from './groupOperations.js'
-import { parseExpenseExcel, toDateKey } from './parseExcel.js'
+import { parseExcelImportFile, parseOzonImportFile } from './parseImportFile.js'
+import { toDateKey } from './parseExcel.js'
+import type { ParsedExpenseRow } from './parseExcel.js'
 import type {
   CategoryInput,
   CategoryMappingInput,
@@ -216,11 +218,10 @@ export function getLastImport() {
     | undefined
 }
 
-export function uploadFileOperations(
-  fileBuffer: Buffer,
+export function uploadParsedOperations(
+  parsed: ParsedExpenseRow[],
   fileName: string,
 ): UploadResult {
-  const parsed = parseExpenseExcel(fileBuffer)
   const batchId = randomUUID()
   const importedAt = new Date().toISOString()
   let inserted = 0
@@ -233,7 +234,7 @@ export function uploadFileOperations(
       year: number
       operationCategory: string
       description: string
-      rows: typeof parsed
+      rows: ParsedExpenseRow[]
     }
   >()
 
@@ -310,6 +311,34 @@ export function uploadFileOperations(
     fileName,
     inserted,
     skipped,
+  }
+}
+
+export function uploadExcelFileOperations(
+  fileBuffer: Buffer,
+  fileName: string,
+): UploadResult {
+  const parsedImport = parseExcelImportFile(fileBuffer)
+  const result = uploadParsedOperations(parsedImport.rows, fileName)
+
+  return {
+    ...result,
+    source: 'excel',
+  }
+}
+
+export function uploadOzonFileOperations(
+  fileBuffer: Buffer,
+  fileName: string,
+): UploadResult {
+  const parsedImport = parseOzonImportFile(fileBuffer)
+  const result = uploadParsedOperations(parsedImport.rows, fileName)
+
+  return {
+    ...result,
+    source: 'ozon',
+    ozonOrders: parsedImport.ozonExport?.orders,
+    ozonReceipts: parsedImport.ozonReceipts?.receipts,
   }
 }
 

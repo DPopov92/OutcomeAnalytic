@@ -1,0 +1,83 @@
+.import-upload-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.import-upload-card {
+  padding: 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.import-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.import-upload-label input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.import-upload-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.1rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+  transition: opacity 0.15s ease;
+}
+
+.import-upload-label:hover .import-upload-button {
+  opacity: 0.92;
+}
+
+.import-upload-label input:disabled + .import-upload-button {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.import-upload-hint,
+.import-upload-details {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.import-upload-details {
+  margin-top: 0.75rem;
+  line-height: 1.45;
+}
+
+.import-upload-details ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.import-upload-details li + li {
+  margin-top: 0.25rem;
+}
+
+.import-upload-details code {
+  font-size: 0.85em;
+}
+
+@media (max-width: 768px) {
+  .import-upload-section {
+    grid-template-columns: 1fr;
+  }
+}

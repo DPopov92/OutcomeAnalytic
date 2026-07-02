@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import {
   cancelImportBatch,
   clearAllData,
@@ -6,9 +6,10 @@ import {
   getLastImport,
   getOperations,
   saveGroupedOperations,
-  uploadFileOperations,
+  uploadExcelFileOperations,
+  uploadOzonFileOperations,
 } from '../db.js'
-import type { ImportPayload, OperationsResponse, PreviewResponse } from '../types.js'
+import type { ImportPayload, OperationsResponse, PreviewResponse, UploadResult } from '../types.js'
 
 export const operationsRouter = Router()
 
@@ -34,7 +35,11 @@ operationsRouter.get('/', (_req, res) => {
   res.json(response)
 })
 
-operationsRouter.post('/upload', (req, res) => {
+function handleUpload(
+  req: Request,
+  res: Response,
+  upload: (fileBuffer: Buffer, fileName: string) => UploadResult,
+) {
   const fileBuffer = req.body
 
   if (!Buffer.isBuffer(fileBuffer) || fileBuffer.length === 0) {
@@ -46,16 +51,24 @@ operationsRouter.post('/upload', (req, res) => {
   const fileName =
     typeof rawFileName === 'string'
       ? decodeURIComponent(rawFileName)
-      : 'import.xlsx'
+      : 'import'
 
   try {
-    const result = uploadFileOperations(fileBuffer, fileName)
+    const result = upload(fileBuffer, fileName)
     res.status(201).json(result)
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Не удалось обработать файл.'
     res.status(400).json({ message })
   }
+}
+
+operationsRouter.post('/upload/excel', (req, res) => {
+  handleUpload(req, res, uploadExcelFileOperations)
+})
+
+operationsRouter.post('/upload/ozon', (req, res) => {
+  handleUpload(req, res, uploadOzonFileOperations)
 })
 
 operationsRouter.get('/preview/:batchId', (req, res) => {

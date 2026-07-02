@@ -12,12 +12,17 @@
     "build:server": "tsc -p server/tsconfig.json",
     "start": "node server/dist/index.js",
     "lint": "oxlint",
+    "test": "tsx --test server/src/parseOzonOrders.test.ts server/src/parseOzonReceipts.test.ts scripts/ozon-checks/composerParse.test.ts scripts/ozon-checks/monthUtils.test.ts",
+    "ozon:checks": "tsx scripts/ozon-checks/cli.ts",
+    "ozon:checks:login": "tsx scripts/ozon-checks/cli.ts --login",
+    "ozon:checks:install": "playwright install chromium",
     "preview": "vite preview"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "lucide-react": "^1.23.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
@@ -32,6 +37,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^9.2.0",
     "oxlint": "^1.71.0",
+    "playwright": "^1.55.0",
     "tsx": "^4.20.3",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"

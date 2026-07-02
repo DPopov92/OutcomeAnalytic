@@ -1,0 +1,55 @@
+{
+  "source": "ozon",
+  "exportedAt": "2026-07-02T12:00:00.000Z",
+  "period": {
+    "from": "2026-01-01",
+    "to": "2026-06-30"
+  },
+  "splitByItems": false,
+  "orders": [
+    {
+      "orderNumber": "12345678-0001",
+      "date": "2026-03-15T14:30:00+03:00",
+      "status": "delivered",
+      "totalAmount": 2499,
+      "items": [
+        {
+          "name": "Наушники XYZ",
+          "quantity": 1,
+          "price": 2499
+        }
+      ]
+    },
+    {
+      "orderNumber": "87654321-0002",
+      "date": "2026-05-20T10:15:00+03:00",
+      "status": "delivered",
+      "totalAmount": 1590.5,
+      "items": [
+        {
+          "name": "Кабель USB-C",
+          "quantity": 2,
+          "price": 395.25
+        },
+        {
+          "name": "Чехол для телефона",
+          "quantity": 1,
+          "price": 800
+        }
+      ]
+    },
+    {
+      "orderNumber": "11223344-0003",
+      "date": "2026-02-01T08:00:00+03:00",
+      "status": "cancelled",
+      "totalAmount": 499,
+      "items": [
+        {
+          "name": "Книга",
+          "quantity": 1,
+          "price": 499
+        }
+      ]
+    }
+  ]
+}

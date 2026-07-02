@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import type { Category } from '../types/category'
 import { resolveCategoryColor } from '../utils/categoryColors'
+import { CancelIcon } from '../assets/icons/CancelIcon'
 import { ChevronDownIcon } from '../assets/icons/ChevronDownIcon'
 import './CategorySelect.css'
 
@@ -11,6 +12,7 @@ interface CategorySelectProps {
   placeholder?: string
   hasError?: boolean
   disabled?: boolean
+  clearable?: boolean
   onChange: (value: string) => void
 }
 
@@ -58,6 +60,7 @@ export function CategorySelect({
   placeholder = 'Категория',
   hasError = false,
   disabled = false,
+  clearable = false,
   onChange,
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false)
@@ -96,32 +99,65 @@ export function CategorySelect({
     setOpen(false)
   }
 
+  function handleClear() {
+    onChange('')
+    setOpen(false)
+  }
+
+  const canClear = clearable && !disabled && value.trim().length > 0
+
   return (
     <div
       ref={containerRef}
       className={`category-select${open ? ' category-select-open' : ''}${
         hasError ? ' category-select-error' : ''
-      }`}
+      }${disabled ? ' category-select-disabled' : ''}`}
     >
-      <button
-        type="button"
-        className="category-select-trigger"
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listboxId}
-        onClick={() => setOpen((current) => !current)}
-      >
-        {value ? (
-          <CategoryLabel name={value} color={selectedColor} />
-        ) : (
-          <span className="category-select-placeholder">{placeholder}</span>
+      <div className="category-select-trigger">
+        <button
+          type="button"
+          className="category-select-main"
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          onClick={() => setOpen((current) => !current)}
+        >
+          {value ? (
+            <CategoryLabel name={value} color={selectedColor} />
+          ) : (
+            <span className="category-select-placeholder">{placeholder}</span>
+          )}
+          <ChevronDownIcon className="category-select-chevron" size={16} strokeWidth={2} />
+        </button>
+        {canClear && (
+          <button
+            type="button"
+            className="category-select-clear"
+            aria-label="Очистить категорию"
+            title="Очистить"
+            onClick={handleClear}
+          >
+            <CancelIcon size={14} strokeWidth={2} />
+          </button>
         )}
-        <ChevronDownIcon className="category-select-chevron" size={16} strokeWidth={2} />
-      </button>
+      </div>
 
       {open && (
         <ul id={listboxId} className="category-select-menu" role="listbox">
+          {canClear && (
+            <li role="presentation">
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                className="category-select-option category-select-option-clear"
+                onClick={handleClear}
+              >
+                Очистить
+              </button>
+            </li>
+          )}
           {categories.map((category) => (
             <li key={category.id} role="presentation">
               <button

@@ -26,11 +26,38 @@ export interface GroupedPreviewRecord {
   amount: number
 }
 
+export interface OzonExportOrderDto {
+  orderNumber: string
+  date: string
+  status: string
+  totalAmount: number
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+  }>
+}
+
+export interface OzonReceiptItemDto {
+  name: string
+  quantity: number
+  price: number
+}
+
+export interface OzonReceiptDto {
+  totalAmount: number
+  date: string
+  items: OzonReceiptItemDto[]
+}
+
 export interface UploadResult {
   batchId: string
   fileName: string
   inserted: number
   skipped: number
+  source?: 'excel' | 'ozon'
+  ozonOrders?: OzonExportOrderDto[]
+  ozonReceipts?: OzonReceiptDto[]
 }
 
 export interface ImportPayload {

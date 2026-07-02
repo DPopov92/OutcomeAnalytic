@@ -7,15 +7,17 @@ import {
   fetchOperations,
   importOperations,
   mapOperationDto,
-  uploadOperationsFile,
+  uploadExcelFile,
+  uploadOzonFile,
 } from '../api/operations'
 import { CategoryManagerModal } from '../components/CategoryManagerModal'
-import { FileUpload } from '../components/FileUpload'
 import { ImportPreviewModal } from '../components/ImportPreviewModal'
+import { ImportUploadSection } from '../components/ImportUploadSection'
 import { OperationsTable } from '../components/OperationsTable'
 import { PeriodFilter } from '../components/PeriodFilter'
 import type { Category } from '../types/category'
 import type { GroupedExpense, GroupedPreviewOperation } from '../types/expense'
+import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
 import { buildCategoryColorMap } from '../utils/categoryColors'
 import {
   filterOperationsByPeriod,
@@ -31,6 +33,9 @@ interface ImportPreview {
   operations: GroupedPreviewOperation[]
   inserted: number
   skipped: number
+  source: 'excel' | 'ozon'
+  ozonOrders?: OzonExportOrder[]
+  ozonReceipts?: OzonReceipt[]
 }
 
 export function HomePage() {
@@ -124,12 +129,15 @@ export function HomePage() {
     }
   }, [preview, categoryManagerOpen])
 
-  async function handleFileSelect(file: File) {
+  async function handleImportFile(
+    file: File,
+    upload: (file: File) => Promise<Awaited<ReturnType<typeof uploadExcelFile>>>,
+  ) {
     setParsing(true)
     setError(null)
 
     try {
-      const uploadResult = await uploadOperationsFile(file)
+      const uploadResult = await upload(file)
 
       if (uploadResult.inserted === 0) {
         setError(
@@ -148,12 +156,23 @@ export function HomePage() {
         operations: previewData.operations,
         inserted: uploadResult.inserted,
         skipped: uploadResult.skipped,
+        source: uploadResult.source ?? 'excel',
+        ozonOrders: uploadResult.ozonOrders,
+        ozonReceipts: uploadResult.ozonReceipts,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось обработать файл.')
     } finally {
       setParsing(false)
     }
+  }
+
+  function handleExcelFileSelect(file: File) {
+    return handleImportFile(file, uploadExcelFile)
+  }
+
+  function handleOzonFileSelect(file: File) {
+    return handleImportFile(file, uploadOzonFile)
   }
 
   async function handleConfirmSave(payload: {
@@ -258,8 +277,8 @@ export function HomePage() {
           <div>
             <h1>Главная</h1>
             <p>
-              Загрузите Excel-файл, назначьте категории операциям и сохраните
-              сгруппированные данные.
+              Загрузите Excel-отчёт или выгрузку Ozon, назначьте категории операциям
+              и сохраните сгруппированные данные.
             </p>
           </div>
           <div className="page-header-actions">
@@ -285,9 +304,10 @@ export function HomePage() {
       </header>
 
       <main className="page-main">
-        <FileUpload
-          onFileSelect={handleFileSelect}
+        <ImportUploadSection
           disabled={parsing || saving || initialLoading || preview !== null}
+          onExcelFileSelect={(file) => void handleExcelFileSelect(file)}
+          onOzonFileSelect={(file) => void handleOzonFileSelect(file)}
         />
 
         {initialLoading && (
@@ -344,6 +364,8 @@ export function HomePage() {
           categories={categories}
           saving={saving}
           categoryColors={categoryColors}
+          ozonOrders={preview.source === 'ozon' ? preview.ozonOrders : undefined}
+          ozonReceipts={preview.source === 'ozon' ? preview.ozonReceipts : undefined}
           onConfirm={(payload) => void handleConfirmSave(payload)}
           onCancel={handleCancelPreview}
         />

@@ -1,5 +1,7 @@
 import type { GroupedExpense } from '../types/expense'
 
+import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
+
 export interface OperationDto {
   id: number
   month: number
@@ -21,6 +23,9 @@ export interface UploadResponse {
   fileName: string
   inserted: number
   skipped: number
+  source?: 'excel' | 'ozon'
+  ozonOrders?: OzonExportOrder[]
+  ozonReceipts?: OzonReceipt[]
 }
 
 export interface PreviewOperationDto {
@@ -90,8 +95,21 @@ export async function fetchOperations(): Promise<OperationsResponse> {
   return parseJsonResponse<OperationsResponse>(response)
 }
 
-export async function uploadOperationsFile(file: File): Promise<UploadResponse> {
-  const response = await fetch('/api/operations/upload', {
+export async function uploadExcelFile(file: File): Promise<UploadResponse> {
+  const response = await fetch('/api/operations/upload/excel', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-File-Name': encodeURIComponent(file.name),
+    },
+    body: file,
+  })
+
+  return parseJsonResponse<UploadResponse>(response)
+}
+
+export async function uploadOzonFile(file: File): Promise<UploadResponse> {
+  const response = await fetch('/api/operations/upload/ozon', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/octet-stream',
