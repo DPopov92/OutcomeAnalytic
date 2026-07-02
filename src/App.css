@@ -1,97 +1,3 @@
-.app {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
-  text-align: left;
-}
-
-.app-header {
-  margin-bottom: 2rem;
-}
-
-.app-header-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.app-header-actions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.header-action-btn {
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-
-.header-action-btn:hover:not(:disabled) {
-  background: var(--table-hover);
-}
-
-.header-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 2rem;
-  letter-spacing: -0.02em;
-}
-
-.dev-clear-btn {
-  flex-shrink: 0;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  border-radius: 8px;
-  background: rgba(239, 68, 68, 0.08);
-  color: #b91c1c;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-
-.dev-clear-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.15);
-}
-
-.dev-clear-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-@media (prefers-color-scheme: dark) {
-  .dev-clear-btn {
-    color: #fca5a5;
-  }
-}
-
-.app-header p {
-  margin: 0;
-  color: var(--text-muted);
-  max-width: 42rem;
-}
-
-.app-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
 .upload-section {
   padding: 1.5rem;
   border: 1px dashed var(--border);
@@ -144,30 +50,6 @@
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
   color: var(--text-muted);
-}
-
-.status {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-}
-
-.status-loading {
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.status-success {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: var(--text);
-}
-
-.status-error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #b91c1c;
 }
 
 .table-section {
@@ -319,10 +201,4 @@ tbody tr:hover {
   color: var(--accent);
   font-size: 0.85rem;
   font-weight: 500;
-}
-
-@media (prefers-color-scheme: dark) {
-  .status-error {
-    color: #fca5a5;
-  }
 }

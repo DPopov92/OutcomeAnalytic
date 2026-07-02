@@ -1,1 +1,1 @@
-{"root":["./src/db.ts","./src/index.ts","./src/types.ts","./src/routes/categories.ts","./src/routes/operations.ts"],"version":"6.0.3"}
+{"root":["./src/db.ts","./src/groupoperations.ts","./src/index.ts","./src/parseexcel.ts","./src/types.ts","./src/routes/categories.ts","./src/routes/categorymappings.ts","./src/routes/operations.ts"],"errors":true,"version":"6.0.3"}
