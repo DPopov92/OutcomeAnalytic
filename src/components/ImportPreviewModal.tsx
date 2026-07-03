@@ -12,7 +12,16 @@ import { useEffect, useState } from 'react'
 import { fetchCategoryMappings } from '../api/categoryMappings'
 import type { Category } from '../types/category'
 import { buildMappingKey, type CategoryMappingInput, type GroupedPreviewOperation } from '../types/expense'
+import type { ExcelOperationGroup } from '../types/excel'
 import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
+import {
+  ExcelImportTable,
+  areAllExcelItemsCategorized,
+  buildExcelImportGroups,
+  collectExcelSaveOperations,
+  countActiveExcelGroups,
+  type ExcelImportGroupState,
+} from './ExcelImportTable'
 import { ImportPreviewTable, type PreviewOperation } from './ImportPreviewTable'
 import {
   OzonReceiptsImportTable,
@@ -42,6 +51,7 @@ interface ImportPreviewModalProps {
   categoryColors?: Record<string, string>
   ozonOrders?: OzonExportOrder[]
   ozonReceipts?: OzonReceipt[]
+  excelGroups?: ExcelOperationGroup[]
   onConfirm: (payload: {
     operations: Array<{
       month: number
@@ -66,15 +76,20 @@ export function ImportPreviewModal({
   categoryColors = {},
   ozonOrders,
   ozonReceipts,
+  excelGroups,
   onConfirm,
   onCancel,
 }: ImportPreviewModalProps) {
   const isReceiptsImport = Boolean(ozonReceipts && ozonReceipts.length > 0)
+  const isExcelImport = Boolean(excelGroups && excelGroups.length > 0)
   const [editableOperations, setEditableOperations] = useState<PreviewOperation[]>(() =>
     buildEditableOperations(operations),
   )
   const [receiptGroups, setReceiptGroups] = useState<OzonReceiptGroupState[]>(() =>
     ozonReceipts ? buildOzonReceiptGroups(ozonReceipts) : [],
+  )
+  const [excelImportGroups, setExcelImportGroups] = useState<ExcelImportGroupState[]>(() =>
+    excelGroups ? buildExcelImportGroups(excelGroups) : [],
   )
   const [validationError, setValidationError] = useState<string | null>(null)
   const [mappingsLoading, setMappingsLoading] = useState(true)
@@ -88,6 +103,12 @@ export function ImportPreviewModal({
       setReceiptGroups(buildOzonReceiptGroups(ozonReceipts))
     }
   }, [ozonReceipts])
+
+  useEffect(() => {
+    if (excelGroups) {
+      setExcelImportGroups(buildExcelImportGroups(excelGroups))
+    }
+  }, [excelGroups])
 
   useEffect(() => {
     let cancelled = false
@@ -157,6 +178,32 @@ export function ImportPreviewModal({
               }
             }),
           )
+        } else if (isExcelImport) {
+          setExcelImportGroups((current) =>
+            current.map((group) => {
+              if (group.userCategory.trim()) {
+                return group
+              }
+
+              const mappedCategory = mappingByKey.get(
+                buildMappingKey(group.operationCategory, group.description),
+              )
+
+              if (!mappedCategory || !categoryNames.has(mappedCategory)) {
+                return group
+              }
+
+              return {
+                ...group,
+                userCategory: mappedCategory,
+                items: group.items.map((item) => ({
+                  ...item,
+                  userCategory: mappedCategory,
+                  categoryFromParent: true,
+                })),
+              }
+            }),
+          )
         } else {
           setEditableOperations((current) =>
             current.map((operation) => {
@@ -190,14 +237,17 @@ export function ImportPreviewModal({
     return () => {
       cancelled = true
     }
-  }, [operations, categories, isReceiptsImport, ozonReceipts])
+  }, [operations, categories, isReceiptsImport, isExcelImport, ozonReceipts, excelGroups])
 
   const activeOperations = editableOperations.filter((operation) => !operation.removed)
   const activeReceiptItemCount = countActiveOzonReceiptItems(receiptGroups)
+  const activeExcelGroupCount = countActiveExcelGroups(excelImportGroups)
 
   const allCategoriesAssigned = isReceiptsImport
     ? areAllOzonReceiptItemsCategorized(receiptGroups)
-    : activeOperations.every((operation) => operation.userCategory.trim().length > 0)
+    : isExcelImport
+      ? areAllExcelItemsCategorized(excelImportGroups)
+      : activeOperations.every((operation) => operation.userCategory.trim().length > 0)
 
   function handleToggleOperationRemoved(id: string) {
     setEditableOperations((current) =>
@@ -292,6 +342,72 @@ export function ImportPreviewModal({
     setValidationError(null)
   }
 
+  function handleExcelGroupsChange(groups: ExcelImportGroupState[]) {
+    setExcelImportGroups(groups)
+    setValidationError(null)
+  }
+
+  function handleToggleExcelGroupRemoved(groupId: string) {
+    setExcelImportGroups((current) =>
+      current.map((group) => {
+        if (group.id !== groupId) {
+          return group
+        }
+
+        const removed = !group.removed
+        return {
+          ...group,
+          removed,
+          items: group.items.map((item) => ({ ...item, removed })),
+        }
+      }),
+    )
+    setValidationError(null)
+  }
+
+  function handleToggleExcelItemRemoved(groupId: string, itemId: string) {
+    setExcelImportGroups((current) =>
+      current.map((group) => {
+        if (group.id !== groupId) {
+          return group
+        }
+
+        const parentCategory = group.userCategory.trim()
+
+        return {
+          ...group,
+          items: group.items.map((item) => {
+            if (item.id !== itemId) {
+              return item
+            }
+
+            const removed = !item.removed
+
+            if (removed) {
+              return { ...item, removed: true }
+            }
+
+            if (parentCategory) {
+              return {
+                ...item,
+                removed: false,
+                userCategory: parentCategory,
+                categoryFromParent: true,
+              }
+            }
+
+            return {
+              ...item,
+              removed: false,
+              categoryFromParent: false,
+            }
+          }),
+        }
+      }),
+    )
+    setValidationError(null)
+  }
+
   function handleSave() {
     if (categories.length === 0) {
       setValidationError(
@@ -309,6 +425,19 @@ export function ImportPreviewModal({
 
     if (isReceiptsImport) {
       const saveOperations = collectOzonReceiptSaveOperations(receiptGroups)
+      onConfirm({
+        operations: saveOperations,
+        mappings: saveOperations.map(({ operationCategory, description, category }) => ({
+          operationCategory,
+          description,
+          category,
+        })),
+      })
+      return
+    }
+
+    if (isExcelImport) {
+      const saveOperations = collectExcelSaveOperations(excelImportGroups)
       onConfirm({
         operations: saveOperations,
         mappings: saveOperations.map(({ operationCategory, description, category }) => ({
@@ -341,7 +470,9 @@ export function ImportPreviewModal({
 
   const canSave = isReceiptsImport
     ? activeReceiptItemCount > 0
-    : activeOperations.length > 0
+    : isExcelImport
+      ? activeExcelGroupCount > 0
+      : activeOperations.length > 0
 
   return (
     <Dialog open fullWidth maxWidth="lg" onClose={saving ? undefined : onCancel}>
@@ -358,6 +489,11 @@ export function ImportPreviewModal({
               <>
                 Назначьте категории позициям из чеков Ozon в файле{' '}
                 <strong>{fileName}</strong> перед сохранением.
+              </>
+            ) : isExcelImport ? (
+              <>
+                Назначьте категории операциям из файла <strong>{fileName}</strong> перед
+                сохранением.
               </>
             ) : (
               <>
@@ -406,6 +542,16 @@ export function ImportPreviewModal({
             onGroupsChange={handleReceiptGroupsChange}
             onToggleGroupRemoved={saving ? undefined : handleToggleReceiptGroupRemoved}
             onToggleItemRemoved={saving ? undefined : handleToggleReceiptItemRemoved}
+          />
+        ) : isExcelImport ? (
+          <ExcelImportTable
+            groups={excelImportGroups}
+            categories={categories}
+            categoryColors={categoryColors}
+            highlightMissingCategories={validationError !== null && !allCategoriesAssigned}
+            onGroupsChange={handleExcelGroupsChange}
+            onToggleGroupRemoved={saving ? undefined : handleToggleExcelGroupRemoved}
+            onToggleItemRemoved={saving ? undefined : handleToggleExcelItemRemoved}
           />
         ) : (
           <>

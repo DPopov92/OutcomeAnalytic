@@ -28,6 +28,8 @@ import { CategoryBadge } from './CategoryBadge'
 import { CategoryColorPicker } from './CategoryColorPicker'
 
 const DEFAULT_COLOR = DEFAULT_CATEGORY_COLOR
+const ICON_SIZE = 20
+const ICON_STROKE = 2
 
 interface CategoryManagerModalProps {
   categories: Category[]
@@ -174,7 +176,7 @@ export function CategoryManagerModal({
           </Typography>
         </Box>
         <IconButton aria-label="Закрыть" disabled={busy} onClick={onClose} sx={{ mt: -0.5 }}>
-          ×
+          <CancelIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
         </IconButton>
       </DialogTitle>
 
@@ -201,7 +203,7 @@ export function CategoryManagerModal({
             aria-label="Добавить категорию"
             title="Добавить категорию"
           >
-            <AddIcon size={20} strokeWidth={2.5} />
+            <AddIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
           </IconButton>
         </Box>
 
@@ -252,7 +254,7 @@ export function CategoryManagerModal({
                       title="Сохранить"
                       onClick={() => void handleSaveEdit()}
                     >
-                      <SaveIcon size={16} strokeWidth={2} />
+                      <SaveIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                     </IconButton>
                     <IconButton
                       disabled={busy}
@@ -260,33 +262,29 @@ export function CategoryManagerModal({
                       title="Отмена"
                       onClick={cancelEdit}
                     >
-                      <CancelIcon size={16} strokeWidth={2} />
+                      <CancelIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                     </IconButton>
                   </Stack>
                 ) : (
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: '100%' }}>
                     <CategoryBadge name={category.name} color={category.color} />
-                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                      {category.color}
-                    </Typography>
+                    <Box sx={{ flex: 1 }} />
                     <IconButton
-                      size="small"
                       disabled={busy}
                       aria-label={`Изменить категорию «${category.name}»`}
                       title="Изменить"
                       onClick={() => startEdit(category)}
                     >
-                      <EditIcon size={16} strokeWidth={2} />
+                      <EditIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                     </IconButton>
                     <IconButton
-                      size="small"
                       color="error"
                       disabled={busy}
                       aria-label={`Удалить категорию «${category.name}»`}
                       title="Удалить"
                       onClick={() => void handleDelete(category)}
                     >
-                      <DeleteIcon size={16} strokeWidth={2} />
+                      <DeleteIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                     </IconButton>
                   </Stack>
                 )}

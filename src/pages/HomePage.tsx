@@ -25,6 +25,7 @@ import { OperationsTable } from '../components/OperationsTable'
 import { PeriodSelect } from '../components/PeriodSelect'
 import type { Category } from '../types/category'
 import type { GroupedExpense, GroupedPreviewOperation } from '../types/expense'
+import type { ExcelOperationGroup } from '../types/excel'
 import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
 import { buildCategoryColorMap } from '../utils/categoryColors'
 import {
@@ -43,6 +44,7 @@ interface ImportPreview {
   source: 'excel' | 'ozon'
   ozonOrders?: OzonExportOrder[]
   ozonReceipts?: OzonReceipt[]
+  excelGroups?: ExcelOperationGroup[]
 }
 
 export function HomePage() {
@@ -159,6 +161,7 @@ export function HomePage() {
         source: uploadResult.source ?? 'excel',
         ozonOrders: uploadResult.ozonOrders,
         ozonReceipts: uploadResult.ozonReceipts,
+        excelGroups: uploadResult.excelGroups,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось обработать файл.')
@@ -400,6 +403,7 @@ export function HomePage() {
           categoryColors={categoryColors}
           ozonOrders={preview.source === 'ozon' ? preview.ozonOrders : undefined}
           ozonReceipts={preview.source === 'ozon' ? preview.ozonReceipts : undefined}
+          excelGroups={preview.source === 'excel' ? preview.excelGroups : undefined}
           onConfirm={(payload) => void handleConfirmSave(payload)}
           onCancel={handleCancelPreview}
         />

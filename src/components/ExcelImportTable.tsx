@@ -9,144 +9,55 @@ import { ChevronDownIcon } from '../assets/icons/ChevronDownIcon'
 import { DeleteIcon } from '../assets/icons/DeleteIcon'
 import { RestoreIcon } from '../assets/icons/RestoreIcon'
 import type { Category } from '../types/category'
-import type { OzonReceipt } from '../types/ozon'
-import { ozonReceiptItemLineTotal } from '../types/ozon'
+import type { ExcelOperationGroup } from '../types/excel'
 import { CategorySelect } from './CategorySelect'
 
-export const OZON_RECEIPT_OPERATION_CATEGORY = 'Ozon'
-
-export interface OzonReceiptItemState {
+export interface ExcelImportItemState {
   id: string
-  description: string
+  date: string
+  time?: string
   amount: number
-  month: number
-  year: number
   userCategory: string
   categoryFromParent: boolean
   removed: boolean
 }
 
-export interface OzonReceiptGroupState {
+export interface ExcelImportGroupState {
   id: string
-  date: string
+  month: number
+  year: number
+  operationCategory: string
+  description: string
   totalAmount: number
   userCategory: string
   removed: boolean
-  items: OzonReceiptItemState[]
+  items: ExcelImportItemState[]
 }
 
-const parentGridColumns = '40px 1.4fr 0.7fr 0.9fr 1.4fr 48px'
-const childGridColumns = '2fr 0.9fr 1.4fr 48px'
+const parentGridColumns = '40px 0.9fr 1fr 1.4fr 0.9fr 1.4fr 48px'
 
-function buildItemDescription(name: string, quantity: number): string {
-  const label = name.trim() || 'Товар'
-  if (quantity > 1) {
-    return `Чек Ozon: ${label} (${quantity} шт.)`
-  }
+const amountFormatter = new Intl.NumberFormat('ru-RU', {
+  style: 'currency',
+  currency: 'RUB',
+  minimumFractionDigits: 2,
+})
 
-  return `Чек Ozon: ${label}`
+const removedRowSx = {
+  opacity: 0.5,
+  textDecoration: 'line-through',
 }
 
-export function buildOzonReceiptGroups(receipts: OzonReceipt[]): OzonReceiptGroupState[] {
-  return receipts.map((receipt, receiptIndex) => {
-    const parsedDate = new Date(receipt.date)
-    const month = parsedDate.getMonth() + 1
-    const year = parsedDate.getFullYear()
-
-    return {
-      id: `receipt-${receiptIndex}`,
-      date: receipt.date,
-      totalAmount: receipt.totalAmount,
-      userCategory: '',
-      removed: false,
-      items: receipt.items.map((item, itemIndex) => ({
-        id: `receipt-${receiptIndex}-item-${itemIndex}`,
-        description: buildItemDescription(item.name, item.quantity),
-        amount: ozonReceiptItemLineTotal(item),
-        month,
-        year,
-        userCategory: '',
-        categoryFromParent: false,
-        removed: false,
-      })),
-    }
+function formatPeriod(month: number, year: number): string {
+  const parsed = new Date(year, month - 1, 1)
+  return parsed.toLocaleString('ru-RU', {
+    month: 'short',
+    year: 'numeric',
   })
 }
 
-export function collectOzonReceiptSaveOperations(groups: OzonReceiptGroupState[]) {
-  const operations: Array<{
-    month: number
-    year: number
-    operationCategory: string
-    description: string
-    category: string
-    amount: number
-  }> = []
-
-  for (const group of groups) {
-    if (group.removed) {
-      continue
-    }
-
-    for (const item of group.items) {
-      if (item.removed) {
-        continue
-      }
-
-      operations.push({
-        month: item.month,
-        year: item.year,
-        operationCategory: OZON_RECEIPT_OPERATION_CATEGORY,
-        description: item.description,
-        category: item.userCategory.trim(),
-        amount: item.amount,
-      })
-    }
-  }
-
-  return operations
-}
-
-export function areAllOzonReceiptItemsCategorized(groups: OzonReceiptGroupState[]): boolean {
-  for (const group of groups) {
-    if (group.removed) {
-      continue
-    }
-
-    for (const item of group.items) {
-      if (item.removed) {
-        continue
-      }
-
-      if (!item.userCategory.trim()) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
-
-export function countActiveOzonReceiptItems(groups: OzonReceiptGroupState[]): number {
-  let count = 0
-
-  for (const group of groups) {
-    if (group.removed) {
-      continue
-    }
-
-    for (const item of group.items) {
-      if (!item.removed) {
-        count += 1
-      }
-    }
-  }
-
-  return count
-}
-
 function formatDate(value: string): string {
-  const parsed = new Date(value)
+  const [yearStr, monthStr, dayStr] = value.split('-')
+  const parsed = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr))
   if (Number.isNaN(parsed.getTime())) {
     return value
   }
@@ -155,30 +66,31 @@ function formatDate(value: string): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   })
 }
 
-function formatItemDescription(description: string): string {
-  return description.replace(/^Чек Ozon: /, '')
+function formatDateTime(date: string, time?: string): string {
+  const formattedDate = formatDate(date)
+  if (time) {
+    return `${formattedDate}, ${time}`
+  }
+
+  return formattedDate
 }
 
-const amountFormatter = new Intl.NumberFormat('ru-RU', {
-  style: 'currency',
-  currency: 'RUB',
-  minimumFractionDigits: 2,
-})
+function formatGroupOperationsLabel(count: number): string {
+  const mod10 = count % 10
+  const mod100 = count % 100
 
-function isParentCategoryDisabled(group: OzonReceiptGroupState): boolean {
-  return group.items.some(
-    (item) => !item.removed && !item.categoryFromParent && item.userCategory.trim() !== '',
-  )
-}
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} операция в группе`
+  }
 
-const removedRowSx = {
-  opacity: 0.5,
-  textDecoration: 'line-through',
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    return `${count} операции в группе`
+  }
+
+  return `${count} операций в группе`
 }
 
 const expandButtonSx = {
@@ -194,17 +106,146 @@ const expandButtonSx = {
   },
 } as const
 
-interface OzonReceiptsImportTableProps {
-  groups: OzonReceiptGroupState[]
+function resolveGroupCategory(group: ExcelImportGroupState): string {
+  const parentCategory = group.userCategory.trim()
+  if (parentCategory) {
+    return parentCategory
+  }
+
+  for (const item of group.items) {
+    if (!item.removed && item.userCategory.trim()) {
+      return item.userCategory.trim()
+    }
+  }
+
+  return ''
+}
+
+function getActiveItems(group: ExcelImportGroupState): ExcelImportItemState[] {
+  return group.items.filter((item) => !item.removed)
+}
+
+function hasMultipleItems(group: ExcelImportGroupState): boolean {
+  return group.items.length > 1
+}
+
+export function buildExcelImportGroups(groups: ExcelOperationGroup[]): ExcelImportGroupState[] {
+  return groups.map((group, groupIndex) => ({
+    id: `excel-group-${groupIndex}`,
+    month: group.month,
+    year: group.year,
+    operationCategory: group.operationCategory,
+    description: group.description,
+    totalAmount: group.totalAmount,
+    userCategory: '',
+    removed: false,
+    items: group.items.map((item, itemIndex) => ({
+      id: `excel-group-${groupIndex}-item-${itemIndex}`,
+      date: item.date,
+      time: item.time,
+      amount: item.amount,
+      userCategory: '',
+      categoryFromParent: false,
+      removed: false,
+    })),
+  }))
+}
+
+export function collectExcelSaveOperations(groups: ExcelImportGroupState[]) {
+  const operations: Array<{
+    month: number
+    year: number
+    operationCategory: string
+    description: string
+    category: string
+    amount: number
+  }> = []
+
+  for (const group of groups) {
+    if (group.removed) {
+      continue
+    }
+
+    const activeItems = getActiveItems(group)
+    if (activeItems.length === 0) {
+      continue
+    }
+
+    const category = resolveGroupCategory(group)
+    const amount = activeItems.reduce((sum, item) => sum + item.amount, 0)
+
+    operations.push({
+      month: group.month,
+      year: group.year,
+      operationCategory: group.operationCategory,
+      description: group.description,
+      category,
+      amount,
+    })
+  }
+
+  return operations
+}
+
+export function areAllExcelItemsCategorized(groups: ExcelImportGroupState[]): boolean {
+  for (const group of groups) {
+    if (group.removed) {
+      continue
+    }
+
+    const activeItems = getActiveItems(group)
+    if (activeItems.length === 0) {
+      continue
+    }
+
+    if (activeItems.length === 1 || group.userCategory.trim()) {
+      if (!group.userCategory.trim()) {
+        return false
+      }
+      continue
+    }
+
+    for (const item of activeItems) {
+      if (!item.userCategory.trim()) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
+export function countActiveExcelGroups(groups: ExcelImportGroupState[]): number {
+  return groups.filter((group) => {
+    if (group.removed) {
+      return false
+    }
+
+    return group.items.some((item) => !item.removed)
+  }).length
+}
+
+function isParentCategoryDisabled(group: ExcelImportGroupState): boolean {
+  if (!hasMultipleItems(group)) {
+    return false
+  }
+
+  return group.items.some(
+    (item) => !item.removed && !item.categoryFromParent && item.userCategory.trim() !== '',
+  )
+}
+
+interface ExcelImportTableProps {
+  groups: ExcelImportGroupState[]
   categories: Category[]
   categoryColors: Record<string, string>
   highlightMissingCategories?: boolean
-  onGroupsChange: (groups: OzonReceiptGroupState[]) => void
+  onGroupsChange: (groups: ExcelImportGroupState[]) => void
   onToggleGroupRemoved?: (groupId: string) => void
   onToggleItemRemoved?: (groupId: string, itemId: string) => void
 }
 
-export function OzonReceiptsImportTable({
+export function ExcelImportTable({
   groups,
   categories,
   categoryColors,
@@ -212,10 +253,10 @@ export function OzonReceiptsImportTable({
   onGroupsChange,
   onToggleGroupRemoved,
   onToggleItemRemoved,
-}: OzonReceiptsImportTableProps) {
+}: ExcelImportTableProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
 
-  const activeItemCount = countActiveOzonReceiptItems(groups)
+  const activeGroupCount = countActiveExcelGroups(groups)
   const totalAmount = groups.reduce((sum, group) => {
     if (group.removed) {
       return sum
@@ -227,7 +268,7 @@ export function OzonReceiptsImportTable({
     )
   }, 0)
 
-  function updateGroup(groupId: string, updater: (group: OzonReceiptGroupState) => OzonReceiptGroupState) {
+  function updateGroup(groupId: string, updater: (group: ExcelImportGroupState) => ExcelImportGroupState) {
     onGroupsChange(groups.map((group) => (group.id === groupId ? updater(group) : group)))
   }
 
@@ -288,7 +329,7 @@ export function OzonReceiptsImportTable({
   if (groups.length === 0) {
     return (
       <Box sx={{ py: 4, textAlign: 'center' }}>
-        <Typography color="text.secondary">Нет чеков для загрузки.</Typography>
+        <Typography color="text.secondary">Нет операций для загрузки.</Typography>
       </Box>
     )
   }
@@ -305,14 +346,14 @@ export function OzonReceiptsImportTable({
       >
         <Box>
           <Typography variant="h6" component="h2">
-            Чеки Ozon
+            Операции из Excel
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Назначьте категорию всему чеку или отдельным позициям
+            Назначьте категорию группе или отдельным строкам при дублировании
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">
-          Позиций: <strong>{activeItemCount}</strong> · Сумма:{' '}
+          Групп: <strong>{activeGroupCount}</strong> · Сумма:{' '}
           <strong>{amountFormatter.format(totalAmount)}</strong>
         </Typography>
       </Stack>
@@ -333,10 +374,11 @@ export function OzonReceiptsImportTable({
           }}
         >
           <span />
-          <span>Дата заказа</span>
-          <span>Позиции</span>
+          <span>Период</span>
+          <span>Категория операции</span>
+          <span>Описание</span>
           <span>Сумма</span>
-          <span>Категория</span>
+          <span>Ваша категория</span>
           {onToggleGroupRemoved && <span />}
         </Box>
 
@@ -345,8 +387,11 @@ export function OzonReceiptsImportTable({
             const parentDisabled = isParentCategoryDisabled(group)
             const childrenEditable = group.userCategory.trim() === ''
             const groupRemoved = group.removed
-            const isExpanded = expandedGroups.has(group.id)
-            const activeItems = group.items.filter((item) => !item.removed)
+            const expandable = hasMultipleItems(group)
+            const isExpanded = expandable && expandedGroups.has(group.id)
+            const activeItems = getActiveItems(group)
+            const activeAmount = activeItems.reduce((sum, item) => sum + item.amount, 0)
+            const groupLabel = `${formatPeriod(group.month, group.year)} · ${group.description}`
 
             return (
               <Box key={group.id} sx={groupRemoved ? removedRowSx : undefined}>
@@ -360,53 +405,62 @@ export function OzonReceiptsImportTable({
                   }}
                 >
                   <Box>
-                    <IconButton
-                      size="small"
-                      aria-expanded={isExpanded}
-                      aria-label={
-                        isExpanded
-                          ? `Свернуть чек от ${formatDate(group.date)}`
-                          : `Развернуть чек от ${formatDate(group.date)}`
-                      }
-                      title={isExpanded ? 'Свернуть позиции' : 'Развернуть позиции'}
-                      onClick={() => toggleGroupExpanded(group.id)}
-                      sx={expandButtonSx}
-                    >
-                      <ChevronDownIcon
-                        size={18}
-                        strokeWidth={2.5}
-                        style={{
-                          transform: isExpanded ? 'rotate(180deg)' : undefined,
-                          transition: 'transform 0.2s',
-                        }}
-                      />
-                    </IconButton>
+                    {expandable ? (
+                      <IconButton
+                        size="small"
+                        aria-expanded={isExpanded}
+                        aria-label={
+                          isExpanded
+                            ? `Свернуть группу: ${groupLabel}`
+                            : `Развернуть группу: ${groupLabel}`
+                        }
+                        title={isExpanded ? 'Свернуть операции' : 'Развернуть операции'}
+                        onClick={() => toggleGroupExpanded(group.id)}
+                        sx={expandButtonSx}
+                      >
+                        <ChevronDownIcon
+                          size={18}
+                          strokeWidth={2.5}
+                          style={{
+                            transform: isExpanded ? 'rotate(180deg)' : undefined,
+                            transition: 'transform 0.2s',
+                          }}
+                        />
+                      </IconButton>
+                    ) : null}
                   </Box>
 
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
-                      Дата заказа
+                      Период
                     </Typography>
-                    <Typography variant="body2">{formatDate(group.date)}</Typography>
+                    <Typography variant="body2">{formatPeriod(group.month, group.year)}</Typography>
                   </Box>
 
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
-                      Позиции
+                      Категория операции
                     </Typography>
-                    <Typography variant="body2">{group.items.length}</Typography>
+                    <Typography variant="body2">{group.operationCategory}</Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
+                      Описание
+                    </Typography>
+                    <Typography variant="body2">{group.description}</Typography>
                   </Box>
 
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
                       Сумма
                     </Typography>
-                    <Typography variant="body2">{amountFormatter.format(group.totalAmount)}</Typography>
+                    <Typography variant="body2">{amountFormatter.format(activeAmount)}</Typography>
                   </Box>
 
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
-                      Категория
+                      Ваша категория
                     </Typography>
                     {!groupRemoved && (
                       <CategorySelect
@@ -417,11 +471,13 @@ export function OzonReceiptsImportTable({
                         clearable
                         hasError={
                           highlightMissingCategories &&
-                          !parentDisabled &&
                           !group.userCategory.trim() &&
-                          group.items.some(
-                            (item) => !item.removed && !item.userCategory.trim(),
-                          )
+                          (expandable
+                            ? !parentDisabled &&
+                              group.items.some(
+                                (item) => !item.removed && !item.userCategory.trim(),
+                              )
+                            : true)
                         }
                         onChange={(userCategory) =>
                           handleParentCategoryChange(group.id, userCategory)
@@ -438,10 +494,10 @@ export function OzonReceiptsImportTable({
                         onClick={() => onToggleGroupRemoved(group.id)}
                         aria-label={
                           groupRemoved
-                            ? `Вернуть чек от ${formatDate(group.date)}`
-                            : `Исключить чек от ${formatDate(group.date)}`
+                            ? `Вернуть группу: ${groupLabel}`
+                            : `Исключить группу: ${groupLabel}`
                         }
-                        title={groupRemoved ? 'Вернуть чек' : 'Исключить чек'}
+                        title={groupRemoved ? 'Вернуть группу' : 'Исключить группу'}
                       >
                         {groupRemoved ? (
                           <RestoreIcon size={16} strokeWidth={2} />
@@ -453,32 +509,29 @@ export function OzonReceiptsImportTable({
                   )}
                 </Box>
 
-                <Collapse in={isExpanded}>
-                  <Box sx={{ bgcolor: 'action.hover', px: 1.5, pb: 1.5 }}>
-                    <Box
-                      aria-hidden="true"
-                      sx={{
-                        display: { xs: 'none', md: 'grid' },
-                        gridTemplateColumns: childGridColumns,
-                        gap: 1,
-                        py: 1,
-                        typography: 'caption',
-                        fontWeight: 600,
-                        color: 'text.secondary',
-                      }}
-                    >
-                      <span>Описание</span>
-                      <span>Сумма</span>
-                      <span>Категория</span>
-                      {onToggleItemRemoved && <span />}
-                    </Box>
+                {expandable && (
+                  <Collapse in={isExpanded}>
+                    <Box sx={{ bgcolor: 'action.hover', px: 1.5, pb: 1.5 }}>
+                      <Box
+                        aria-hidden="true"
+                        sx={{
+                          display: { xs: 'none', md: 'grid' },
+                          gridTemplateColumns: parentGridColumns,
+                          gap: 1,
+                          py: 1,
+                          typography: 'caption',
+                          fontWeight: 600,
+                          color: 'text.secondary',
+                        }}
+                      >
+                        <span />
+                        <Box sx={{ gridColumn: '2 / 5' }}>Дата и время</Box>
+                        <span>Сумма</span>
+                        <span>Ваша категория</span>
+                        {onToggleItemRemoved && <span />}
+                      </Box>
 
-                    {group.items.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-                        В чеке нет позиций.
-                      </Typography>
-                    ) : (
-                      group.items.map((item) => {
+                      {group.items.map((item) => {
                         const itemRemoved = groupRemoved || item.removed
 
                         return (
@@ -486,7 +539,7 @@ export function OzonReceiptsImportTable({
                             key={item.id}
                             sx={{
                               display: 'grid',
-                              gridTemplateColumns: { xs: '1fr', md: childGridColumns },
+                              gridTemplateColumns: { xs: '1fr', md: parentGridColumns },
                               gap: 1,
                               alignItems: 'center',
                               py: 1,
@@ -495,12 +548,14 @@ export function OzonReceiptsImportTable({
                               ...(itemRemoved ? removedRowSx : undefined),
                             }}
                           >
-                            <Box>
+                            <Box />
+
+                            <Box sx={{ gridColumn: { xs: 'auto', md: '2 / 5' } }}>
                               <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
-                                Описание
+                                Дата и время
                               </Typography>
                               <Typography variant="body2">
-                                {formatItemDescription(item.description)}
+                                {formatDateTime(item.date, item.time)}
                               </Typography>
                             </Box>
 
@@ -513,7 +568,7 @@ export function OzonReceiptsImportTable({
 
                             <Box>
                               <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>
-                                Категория
+                                Ваша категория
                               </Typography>
                               {!itemRemoved && (
                                 <CategorySelect
@@ -541,10 +596,10 @@ export function OzonReceiptsImportTable({
                                   disabled={groupRemoved}
                                   aria-label={
                                     itemRemoved
-                                      ? `Вернуть позицию: ${item.description}`
-                                      : `Исключить позицию: ${item.description}`
+                                      ? `Вернуть операцию от ${formatDateTime(item.date, item.time)}`
+                                      : `Исключить операцию от ${formatDateTime(item.date, item.time)}`
                                   }
-                                  title={itemRemoved ? 'Вернуть позицию' : 'Исключить позицию'}
+                                  title={itemRemoved ? 'Вернуть операцию' : 'Исключить операцию'}
                                 >
                                   {itemRemoved ? (
                                     <RestoreIcon size={16} strokeWidth={2} />
@@ -556,17 +611,16 @@ export function OzonReceiptsImportTable({
                             )}
                           </Box>
                         )
-                      })
-                    )}
+                      })}
 
-                    {!groupRemoved && activeItems.length > 0 && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pt: 1 }}>
-                        {activeItems.length}{' '}
-                        {activeItems.length === 1 ? 'позиция' : 'позиций'} в чеке
-                      </Typography>
-                    )}
-                  </Box>
-                </Collapse>
+                      {!groupRemoved && activeItems.length > 0 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pt: 1 }}>
+                          {formatGroupOperationsLabel(activeItems.length)}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Collapse>
+                )}
               </Box>
             )
           })}

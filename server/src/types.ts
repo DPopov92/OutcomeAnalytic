@@ -50,6 +50,21 @@ export interface OzonReceiptDto {
   items: OzonReceiptItemDto[]
 }
 
+export interface ExcelOperationItemDto {
+  date: string
+  time?: string
+  amount: number
+}
+
+export interface ExcelOperationGroupDto {
+  month: number
+  year: number
+  operationCategory: string
+  description: string
+  totalAmount: number
+  items: ExcelOperationItemDto[]
+}
+
 export interface UploadResult {
   batchId: string
   fileName: string
@@ -58,6 +73,7 @@ export interface UploadResult {
   source?: 'excel' | 'ozon'
   ozonOrders?: OzonExportOrderDto[]
   ozonReceipts?: OzonReceiptDto[]
+  excelGroups?: ExcelOperationGroupDto[]
 }
 
 export interface GroupedOperationInput {

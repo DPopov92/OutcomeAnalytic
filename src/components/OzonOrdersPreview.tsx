@@ -52,8 +52,22 @@ function formatStatus(status: string): string {
   return labels[normalized] ?? status
 }
 
+const expandChevronSx = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  border: 1,
+  borderColor: 'divider',
+  bgcolor: 'background.paper',
+  color: 'text.primary',
+  borderRadius: 1,
+  boxShadow: 1,
+  p: 0.5,
+} as const
+
 export function OzonOrdersPreview({ orders }: OzonOrdersPreviewProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <Paper variant="outlined" sx={{ mb: 2 }}>
@@ -66,6 +80,7 @@ export function OzonOrdersPreview({ orders }: OzonOrdersPreviewProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 1,
           width: '100%',
           p: 1.5,
           border: 'none',
@@ -73,19 +88,26 @@ export function OzonOrdersPreview({ orders }: OzonOrdersPreviewProps) {
           cursor: 'pointer',
           color: 'text.primary',
           font: 'inherit',
+          '&:hover .ozon-orders-expand-chevron': {
+            bgcolor: 'action.selected',
+            borderColor: 'primary.main',
+            color: 'primary.main',
+          },
         }}
       >
         <Typography variant="subtitle2">
           Исходные заказы Ozon ({orders.length})
         </Typography>
-        <ChevronDownIcon
-          size={18}
-          strokeWidth={2}
-          style={{
-            transform: expanded ? 'rotate(180deg)' : undefined,
-            transition: 'transform 0.2s',
-          }}
-        />
+        <Box className="ozon-orders-expand-chevron" sx={expandChevronSx}>
+          <ChevronDownIcon
+            size={18}
+            strokeWidth={2.5}
+            style={{
+              transform: expanded ? 'rotate(180deg)' : undefined,
+              transition: 'transform 0.2s',
+            }}
+          />
+        </Box>
       </Box>
 
       <Collapse in={expanded}>

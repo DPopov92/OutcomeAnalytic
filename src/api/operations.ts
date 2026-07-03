@@ -1,6 +1,7 @@
 import type { GroupedExpense } from '../types/expense'
 
 import type { OzonExportOrder, OzonReceipt } from '../types/ozon'
+import type { ExcelOperationGroup } from '../types/excel'
 
 export interface OperationDto {
   id: number
@@ -26,6 +27,7 @@ export interface UploadResponse {
   source?: 'excel' | 'ozon'
   ozonOrders?: OzonExportOrder[]
   ozonReceipts?: OzonReceipt[]
+  excelGroups?: ExcelOperationGroup[]
 }
 
 export interface PreviewOperationDto {

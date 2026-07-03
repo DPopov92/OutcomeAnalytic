@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { groupFileOperations, buildGroupKey } from './groupOperations.js'
+import { groupFileOperations, buildGroupKey, buildExcelGroupsFromParsedRows } from './groupOperations.js'
 import { parseExcelImportFile, parseOzonImportFile } from './parseImportFile.js'
 import { toDateKey } from './parseExcel.js'
 import type { ParsedExpenseRow } from './parseExcel.js'
@@ -324,9 +324,18 @@ export function uploadExcelFileOperations(
   const parsedImport = parseExcelImportFile(fileBuffer)
   const result = uploadParsedOperations(parsedImport.rows, fileName)
 
+  const stagedRows =
+    result.inserted > 0
+      ? (selectFileOperationsByBatchStmt.all(result.batchId) as unknown as FileOperationRecord[])
+      : []
+
   return {
     ...result,
     source: 'excel',
+    excelGroups:
+      stagedRows.length > 0
+        ? buildExcelGroupsFromParsedRows(parsedImport.rows, stagedRows)
+        : undefined,
   }
 }
 

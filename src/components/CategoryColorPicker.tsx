@@ -14,6 +14,9 @@ interface CategoryColorPickerProps {
   disabled?: boolean
 }
 
+const ICON_SIZE = 20
+const ICON_STROKE = 2
+
 function normalizeColor(color: string): string {
   return color.trim().toLowerCase()
 }
@@ -45,7 +48,7 @@ export function CategoryColorPicker({
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{ color: value }}
       >
-        <PaletteIcon size={20} strokeWidth={2} />
+        <PaletteIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />
       </IconButton>
 
       <Popover
@@ -106,7 +109,7 @@ export function CategoryColorPicker({
           <Button
             size="small"
             variant="outlined"
-            startIcon={<PaletteIcon size={15} strokeWidth={2} />}
+            startIcon={<PaletteIcon size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
             disabled={disabled}
             onClick={() => customInputRef.current?.click()}
           >
