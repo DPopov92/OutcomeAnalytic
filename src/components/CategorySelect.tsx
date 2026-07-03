@@ -15,6 +15,10 @@ interface CategorySelectProps {
   onChange: (value: string) => void
 }
 
+function getCategoryColor(categories: Category[], name: string): string | undefined {
+  return categories.find((item) => item.name === name)?.color
+}
+
 export function CategorySelect({
   value,
   categories,
@@ -38,15 +42,24 @@ export function CategorySelect({
       getOptionLabel={(option) => option}
       isOptionEqualToValue={(option, optionValue) => option === optionValue}
       renderInput={(params) => (
-        <TextField {...params} placeholder={placeholder} error={hasError} />
+        <TextField
+          {...params}
+          placeholder={value ? undefined : placeholder}
+          error={hasError}
+        />
+      )}
+      renderValue={(selectedValue) => (
+        <CategoryBadge
+          name={selectedValue}
+          color={getCategoryColor(categories, selectedValue)}
+        />
       )}
       renderOption={(props, option) => {
-        const category = categories.find((item) => item.name === option)
         const { key, ...optionProps } = props
 
         return (
           <Box component="li" key={key} {...optionProps}>
-            <CategoryBadge name={option} color={category?.color} />
+            <CategoryBadge name={option} color={getCategoryColor(categories, option)} />
           </Box>
         )
       }}
