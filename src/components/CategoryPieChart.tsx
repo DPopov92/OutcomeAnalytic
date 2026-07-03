@@ -1,9 +1,8 @@
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
-import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useTheme } from '@mui/material/styles'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CategoryTotal } from '../utils/aggregateByCategory'
 
 interface CategoryPieChartProps {
@@ -21,11 +20,15 @@ const percentFormatter = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 1,
 })
 
-const MIN_CHART_SIZE = 300
-const MAX_CHART_SIZE = 480
-const CHART_CENTER = MIN_CHART_SIZE / 2
+const CHART_VIEW_SIZE = 300
+const CHART_DISPLAY_SIZE = 360
+const CHART_CENTER = CHART_VIEW_SIZE / 2
 const OUTER_RADIUS = CHART_CENTER - 8
 const INNER_RADIUS = OUTER_RADIUS * 0.62
+const MIN_SLICE_PERCENT = 3
+const LEGEND_ROW_HEIGHT = 36
+const LEGEND_WIDTH = 224
+const OTHER_CATEGORY = 'Прочее'
 
 function polarToCartesian(
   centerX: number,
@@ -118,53 +121,55 @@ function buildDonutSlicePath(
   ].join(' ')
 }
 
+function consolidateSmallCategories(
+  items: CategoryTotal[],
+  otherColor: string,
+): CategoryTotal[] {
+  if (items.length === 0) {
+    return []
+  }
+
+  const total = items.reduce((sum, item) => sum + item.amount, 0)
+  const main: CategoryTotal[] = []
+  let otherAmount = 0
+
+  for (const item of items) {
+    if (item.percentage >= MIN_SLICE_PERCENT) {
+      main.push(item)
+    } else {
+      otherAmount += item.amount
+    }
+  }
+
+  if (otherAmount > 0) {
+    main.push({
+      category: OTHER_CATEGORY,
+      amount: otherAmount,
+      percentage: (otherAmount / total) * 100,
+      color: otherColor,
+    })
+  }
+
+  return main.sort((left, right) => right.amount - left.amount)
+}
+
 export function CategoryPieChart({ items }: CategoryPieChartProps) {
   const theme = useTheme()
-  const visualRef = useRef<HTMLDivElement>(null)
-  const legendRef = useRef<HTMLUListElement>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [tooltipPosition, setTooltipPosition] = useState<{
-    x: number
-    y: number
-  } | null>(null)
-  const [visualSize, setVisualSize] = useState(MIN_CHART_SIZE)
+
+  const chartItems = useMemo(
+    () => consolidateSmallCategories(items, theme.palette.grey[500]),
+    [items, theme.palette.grey],
+  )
 
   useEffect(() => {
     setActiveCategory(null)
-    setTooltipPosition(null)
-  }, [items])
-
-  useEffect(() => {
-    const legend = legendRef.current
-    if (!legend) {
-      return
-    }
-
-    const legendEl = legend
-
-    function syncChartSize() {
-      const legendHeight = legendEl.offsetHeight
-      const nextSize = Math.max(
-        MIN_CHART_SIZE,
-        Math.min(legendHeight, MAX_CHART_SIZE),
-      )
-      setVisualSize(nextSize)
-    }
-
-    syncChartSize()
-
-    const observer = new ResizeObserver(syncChartSize)
-    observer.observe(legend)
-
-    return () => {
-      observer.disconnect()
-    }
   }, [items])
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
 
   let currentAngle = 0
-  const slices = items.map((item) => {
+  const slices = chartItems.map((item) => {
     const sliceAngle = (item.percentage / 100) * 360
     const startAngle = currentAngle
     const endAngle = currentAngle + sliceAngle
@@ -174,40 +179,18 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
       ...item,
       startAngle,
       endAngle,
-      path: buildDonutSlicePath(startAngle, endAngle, items.length === 1),
+      path: buildDonutSlicePath(startAngle, endAngle, chartItems.length === 1),
     }
   })
 
   const activeSlice = slices.find((slice) => slice.category === activeCategory)
 
-  function updateTooltipPosition(event: React.MouseEvent) {
-    const rect = visualRef.current?.getBoundingClientRect()
-    if (!rect) {
-      return
-    }
-
-    setTooltipPosition({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    })
-  }
-
-  function handleSliceEnter(
-    category: string,
-    event: React.MouseEvent<SVGPathElement>,
-  ) {
-    setActiveCategory(category)
-    updateTooltipPosition(event)
-  }
-
-  function handleSliceMove(event: React.MouseEvent<SVGPathElement>) {
-    updateTooltipPosition(event)
-  }
-
-  function handleSliceLeave() {
-    setActiveCategory(null)
-    setTooltipPosition(null)
-  }
+  const containerHeight = useMemo(() => {
+    const legendHeight =
+      chartItems.length * LEGEND_ROW_HEIGHT +
+      Math.max(0, chartItems.length - 1) * 4
+    return Math.max(CHART_DISPLAY_SIZE, legendHeight)
+  }, [chartItems.length])
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -219,21 +202,31 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
-          gap: 3,
-          alignItems: { xs: 'center', md: 'flex-start' },
+          alignItems: { xs: 'center', md: 'stretch' },
+          minHeight: { xs: 'auto', md: containerHeight },
+          width: '100%',
         }}
       >
         <Box
-          ref={visualRef}
           sx={{
-            position: 'relative',
-            width: visualSize,
-            height: visualSize,
-            flexShrink: 0,
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
+          <Box
+            sx={{
+              position: 'relative',
+              width: CHART_DISPLAY_SIZE,
+              height: CHART_DISPLAY_SIZE,
+              maxWidth: '100%',
+              flexShrink: 0,
+            }}
+          >
           <svg
-            viewBox={`0 0 ${MIN_CHART_SIZE} ${MIN_CHART_SIZE}`}
+            viewBox={`0 0 ${CHART_VIEW_SIZE} ${CHART_VIEW_SIZE}`}
             role="img"
             aria-label="Круговая диаграмма расходов по категориям"
             style={{ width: '100%', height: '100%', display: 'block' }}
@@ -254,9 +247,8 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
                     transition: 'opacity 0.15s ease',
                     opacity: isDimmed ? 0.45 : 1,
                   }}
-                  onMouseEnter={(event) => handleSliceEnter(slice.category, event)}
-                  onMouseMove={handleSliceMove}
-                  onMouseLeave={handleSliceLeave}
+                  onMouseEnter={() => setActiveCategory(slice.category)}
+                  onMouseLeave={() => setActiveCategory(null)}
                 />
               )
             })}
@@ -270,51 +262,14 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
             />
           </svg>
 
-          {activeSlice && tooltipPosition && (
-            <Paper
-              elevation={4}
-              role="tooltip"
-              sx={{
-                position: 'absolute',
-                pointerEvents: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                px: 1.5,
-                py: 1,
-                transform: 'translate(-50%, calc(-100% - 12px))',
-                left: tooltipPosition.x,
-                top: tooltipPosition.y,
-                zIndex: 1,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: '50%',
-                  bgcolor: activeSlice.color,
-                  flexShrink: 0,
-                }}
-              />
-              <Box>
-                <Typography variant="subtitle2">{activeSlice.category}</Typography>
-                <Typography variant="body2">{amountFormatter.format(activeSlice.amount)}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {percentFormatter.format(activeSlice.percentage)}%
-                </Typography>
-              </Box>
-            </Paper>
-          )}
-
           <Box
             sx={{
               position: 'absolute',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: `${((INNER_RADIUS - 2) * 2 / MIN_CHART_SIZE) * 100}%`,
-              height: `${((INNER_RADIUS - 2) * 2 / MIN_CHART_SIZE) * 100}%`,
+              width: `${((INNER_RADIUS - 2) * 2 / CHART_VIEW_SIZE) * 100}%`,
+              height: `${((INNER_RADIUS - 2) * 2 / CHART_VIEW_SIZE) * 100}%`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -324,62 +279,143 @@ export function CategoryPieChart({ items }: CategoryPieChartProps) {
               px: 1,
             }}
           >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase' }}
-            >
-              Всего
-            </Typography>
-            <Typography variant="h6" component="p" sx={{ fontWeight: 700, lineHeight: 1.2, mt: 0.25 }}>
-              {amountFormatter.format(totalAmount)}
-            </Typography>
+            {activeSlice ? (
+              <>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  sx={{ maxWidth: '100%', fontWeight: 500 }}
+                >
+                  {activeSlice.category}
+                </Typography>
+                <Typography
+                  variant="subtitle1"
+                  component="p"
+                  sx={{ fontWeight: 700, lineHeight: 1.2, mt: 0.25 }}
+                >
+                  {amountFormatter.format(activeSlice.amount)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {percentFormatter.format(activeSlice.percentage)}%
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase' }}
+                >
+                  Всего
+                </Typography>
+                <Typography
+                  variant="subtitle1"
+                  component="p"
+                  sx={{ fontWeight: 700, lineHeight: 1.2, mt: 0.25 }}
+                >
+                  {amountFormatter.format(totalAmount)}
+                </Typography>
+              </>
+            )}
+          </Box>
           </Box>
         </Box>
 
-        <Stack
-          component="ul"
-          ref={legendRef}
-          spacing={1}
-          sx={{ listStyle: 'none', m: 0, p: 0, flex: 1, width: '100%' }}
+        <Box
+          sx={{
+            flexShrink: 0,
+            width: { xs: '100%', md: LEGEND_WIDTH },
+            maxWidth: { xs: 360, md: LEGEND_WIDTH },
+            mt: { xs: 2, md: 0 },
+            display: 'flex',
+            justifyContent: { xs: 'center', md: 'flex-start' },
+            alignItems: { xs: 'center', md: 'flex-start' },
+            pl: { md: 2 },
+          }}
         >
-          {items.map((item) => (
+          <Box
+            component="ul"
+            sx={{
+              listStyle: 'none',
+              m: 0,
+              p: 0,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+            }}
+          >
+          {chartItems.map((item) => (
             <Box
               component="li"
               key={item.category}
               onMouseEnter={() => setActiveCategory(item.category)}
               onMouseLeave={() => setActiveCategory(null)}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                p: 1,
-                borderRadius: 1,
-                bgcolor: activeCategory === item.category ? 'action.selected' : 'transparent',
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr auto',
+                gridTemplateRows: 'auto auto',
+                columnGap: 0.75,
+                rowGap: 0.25,
+                minWidth: 0,
                 cursor: 'default',
+                opacity: activeCategory === null || activeCategory === item.category ? 1 : 0.5,
+                transition: 'opacity 0.15s ease',
               }}
             >
               <Box
                 sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 0.5,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
                   bgcolor: item.color,
                   flexShrink: 0,
+                  gridRow: 1,
+                  alignSelf: 'center',
                 }}
               />
-              <Typography variant="body2" sx={{ flex: 1 }}>
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{
+                  gridColumn: 2,
+                  gridRow: 1,
+                  minWidth: 0,
+                  color: 'text.primary',
+                  alignSelf: 'center',
+                }}
+              >
                 {item.category}
               </Typography>
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2">{amountFormatter.format(item.amount)}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {percentFormatter.format(item.percentage)}%
-                </Typography>
-              </Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  gridColumn: 3,
+                  gridRow: 1,
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'right',
+                }}
+              >
+                {amountFormatter.format(item.amount)}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  gridColumn: 3,
+                  gridRow: 2,
+                  fontVariantNumeric: 'tabular-nums',
+                  textAlign: 'right',
+                }}
+              >
+                {percentFormatter.format(item.percentage)}%
+              </Typography>
             </Box>
           ))}
-        </Stack>
+          </Box>
+        </Box>
       </Box>
     </Paper>
   )

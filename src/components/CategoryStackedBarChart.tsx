@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
-import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useTheme } from '@mui/material/styles'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -33,6 +32,9 @@ const percentFormatter = new Intl.NumberFormat('ru-RU', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 })
+
+const LEGEND_ROW_HEIGHT = 28
+const LEGEND_WIDTH = 224
 
 const CHART_HEIGHT = 320
 const PADDING_LEFT = 72
@@ -79,6 +81,13 @@ export function CategoryStackedBarChart({ stacks }: CategoryStackedBarChartProps
   const [tooltip, setTooltip] = useState<SegmentTooltip | null>(null)
 
   const legendItems = useMemo(() => collectUniqueCategories(stacks), [stacks])
+
+  const containerHeight = useMemo(() => {
+    const legendHeight =
+      legendItems.length * LEGEND_ROW_HEIGHT +
+      Math.max(0, legendItems.length - 1) * 4
+    return Math.max(CHART_HEIGHT, legendHeight)
+  }, [legendItems.length])
 
   const maxTotal = useMemo(
     () => Math.max(...stacks.map((stack) => stack.total), 0),
@@ -171,8 +180,9 @@ export function CategoryStackedBarChart({ stacks }: CategoryStackedBarChartProps
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
-          gap: 3,
-          alignItems: { xs: 'stretch', md: 'flex-start' },
+          alignItems: { xs: 'stretch', md: 'stretch' },
+          minHeight: { xs: 'auto', md: containerHeight },
+          width: '100%',
         }}
       >
         <Box
@@ -181,6 +191,8 @@ export function CategoryStackedBarChart({ stacks }: CategoryStackedBarChartProps
             position: 'relative',
             flex: 1,
             minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
             overflowX: barCount > SCROLL_THRESHOLD ? 'auto' : 'visible',
           }}
         >
@@ -342,51 +354,67 @@ export function CategoryStackedBarChart({ stacks }: CategoryStackedBarChartProps
           )}
         </Box>
 
-        <Stack
-          component="ul"
-          spacing={1}
+        <Box
           sx={{
-            listStyle: 'none',
-            m: 0,
-            p: 0,
             flexShrink: 0,
-            width: { xs: '100%', md: 220 },
+            width: { xs: '100%', md: LEGEND_WIDTH },
+            maxWidth: { xs: 360, md: LEGEND_WIDTH },
+            mt: { xs: 2, md: 0 },
+            display: 'flex',
+            justifyContent: { xs: 'center', md: 'flex-start' },
+            alignItems: { xs: 'center', md: 'flex-start' },
+            pl: { md: 2 },
           }}
         >
-          {legendItems.map((item) => (
-            <Box
-              component="li"
-              key={item.category}
-              onMouseEnter={() => handleLegendEnter(item.category)}
-              onMouseLeave={handleLegendLeave}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                p: 1,
-                borderRadius: 1,
-                bgcolor:
-                  activeCategory === item.category
-                    ? 'action.selected'
-                    : 'transparent',
-                cursor: 'default',
-              }}
-            >
+          <Box
+            component="ul"
+            sx={{
+              listStyle: 'none',
+              m: 0,
+              p: 0,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+            }}
+          >
+            {legendItems.map((item) => (
               <Box
+                component="li"
+                key={item.category}
+                onMouseEnter={() => handleLegendEnter(item.category)}
+                onMouseLeave={handleLegendLeave}
                 sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 0.5,
-                  bgcolor: item.color,
-                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  minWidth: 0,
+                  cursor: 'default',
+                  opacity:
+                    activeCategory === null || activeCategory === item.category ? 1 : 0.5,
+                  transition: 'opacity 0.15s ease',
                 }}
-              />
-              <Typography variant="body2" sx={{ flex: 1 }}>
-                {item.category}
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
+              >
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: item.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  noWrap
+                  sx={{ minWidth: 0, color: 'text.primary' }}
+                >
+                  {item.category}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
       </Box>
     </Paper>
   )
