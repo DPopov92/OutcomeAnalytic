@@ -1,7 +1,7 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
-import { CategoriesPage } from './pages/CategoriesPage'
 import { HomePage } from './pages/HomePage'
+import { StatisticsPage } from './pages/StatisticsPage'
 
 function App() {
   return (
@@ -9,7 +9,8 @@ function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
-          <Route path="categories" element={<CategoriesPage />} />
+          <Route path="statistics" element={<StatisticsPage />} />
+          <Route path="categories" element={<Navigate to="/statistics" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

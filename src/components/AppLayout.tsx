@@ -56,8 +56,8 @@ export function AppLayout() {
               <Button component={NavLink} to="/" end sx={navLinkSx}>
                 Главная
               </Button>
-              <Button component={NavLink} to="/categories" sx={navLinkSx}>
-                По категориям
+              <Button component={NavLink} to="/statistics" sx={navLinkSx}>
+                Статистика
               </Button>
             </Stack>
           </Toolbar>

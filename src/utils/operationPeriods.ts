@@ -84,3 +84,67 @@ export function getDefaultSelectableYears(): number[] {
 export function getAllMonths(): number[] {
   return Array.from({ length: 12 }, (_, index) => 12 - index)
 }
+
+export function periodToSortKey(period: OperationPeriod): number {
+  return period.year * 12 + period.month
+}
+
+export function isPeriodBefore(
+  left: OperationPeriod,
+  right: OperationPeriod,
+): boolean {
+  return periodToSortKey(left) < periodToSortKey(right)
+}
+
+export function isPeriodAfter(
+  left: OperationPeriod,
+  right: OperationPeriod,
+): boolean {
+  return periodToSortKey(left) > periodToSortKey(right)
+}
+
+export function getEarliestPeriod(
+  operations: GroupedExpense[],
+): OperationPeriod | null {
+  const periods = getAvailablePeriods(operations)
+  return periods[periods.length - 1] ?? null
+}
+
+export function getPeriodsInRange(
+  from: OperationPeriod,
+  to: OperationPeriod,
+): OperationPeriod[] {
+  const startKey = periodToSortKey(from)
+  const endKey = periodToSortKey(to)
+  const [rangeStart, rangeEnd] =
+    startKey <= endKey ? [startKey, endKey] : [endKey, startKey]
+
+  const periods: OperationPeriod[] = []
+
+  for (let key = rangeStart; key <= rangeEnd; key += 1) {
+    const year = Math.floor((key - 1) / 12)
+    const month = ((key - 1) % 12) + 1
+    periods.push({ month, year })
+  }
+
+  return periods
+}
+
+export function filterOperationsByPeriodRange(
+  operations: GroupedExpense[],
+  from: OperationPeriod,
+  to: OperationPeriod,
+): GroupedExpense[] {
+  const startKey = periodToSortKey(from)
+  const endKey = periodToSortKey(to)
+  const rangeStart = Math.min(startKey, endKey)
+  const rangeEnd = Math.max(startKey, endKey)
+
+  return operations.filter((operation) => {
+    const key = periodToSortKey({
+      month: operation.month,
+      year: operation.year,
+    })
+    return key >= rangeStart && key <= rangeEnd
+  })
+}
