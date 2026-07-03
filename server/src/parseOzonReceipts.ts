@@ -43,7 +43,7 @@ export function parseOzonReceiptsFile(
   receiptsFile: OzonReceiptsFile,
   options: ParseOzonReceiptsOptions = {},
 ): ParseOzonReceiptsResult {
-  const filteredReceipts = filterReceiptsByMonth(receiptsFile.receipts, receiptsFile.month)
+  const filteredReceipts = filterReceiptsByExportPeriod(receiptsFile)
 
   if (filteredReceipts.length === 0) {
     throw new Error('В выгрузке Ozon не найдено чеков за указанный период.')
@@ -120,11 +120,44 @@ function mapReceiptToExpenseRows(
   ]
 }
 
-function filterReceiptsByMonth(receipts: OzonReceipt[], month: string | undefined): OzonReceipt[] {
-  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+function filterReceiptsByExportPeriod(receiptsFile: OzonReceiptsFile): OzonReceipt[] {
+  if (receiptsFile.period) {
+    return filterReceiptsByDayMonthYearPeriod(receiptsFile.receipts, receiptsFile.period)
+  }
+
+  if (receiptsFile.month && /^\d{4}-\d{2}$/.test(receiptsFile.month)) {
+    return filterReceiptsByMonth(receiptsFile.receipts, receiptsFile.month)
+  }
+
+  return receiptsFile.receipts
+}
+
+function filterReceiptsByDayMonthYearPeriod(
+  receipts: OzonReceipt[],
+  period: { from: string; to: string },
+): OzonReceipt[] {
+  const fromDate = parseDayMonthYear(period.from)
+  const toDate = parseDayMonthYear(period.to)
+
+  if (!fromDate || !toDate) {
     return receipts
   }
 
+  const start = startOfDay(fromDate)
+  const end = endOfDay(toDate)
+
+  return receipts.filter((receipt) => {
+    const date = parseReceiptDate(receipt.date)
+    if (!date) {
+      return false
+    }
+
+    const timestamp = date.getTime()
+    return timestamp >= start.getTime() && timestamp <= end.getTime()
+  })
+}
+
+function filterReceiptsByMonth(receipts: OzonReceipt[], month: string): OzonReceipt[] {
   const [yearText, monthText] = month.split('-')
   const year = Number(yearText)
   const monthIndex = Number(monthText) - 1
@@ -137,6 +170,36 @@ function filterReceiptsByMonth(receipts: OzonReceipt[], month: string | undefine
 
     return date.getFullYear() === year && date.getMonth() === monthIndex
   })
+}
+
+function parseDayMonthYear(value: string): Date | null {
+  const match = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value.trim())
+  if (!match) {
+    return null
+  }
+
+  const day = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const year = Number(match[3])
+  const date = new Date(year, monthIndex, day)
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== monthIndex ||
+    date.getDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)
+}
+
+function endOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
 }
 
 function parseReceiptDate(value: string): Date | null {

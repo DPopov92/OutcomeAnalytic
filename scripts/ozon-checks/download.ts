@@ -21,9 +21,13 @@ import {
 } from './browser.js'
 import {
   buildMonthClickPatterns,
-  receiptMatchesMonth,
-  textMatchesMonth,
-} from './monthUtils.js'
+  getMonthsInPeriod,
+  parsePeriod,
+  parseReceiptDateFromText,
+  receiptMatchesPeriod,
+  textMatchesPeriod,
+  type Period,
+} from './periodUtils.js'
 
 const E_CHECK_URL = 'https://www.ozon.ru/my/e-check'
 const OZON_HOME_URL = 'https://www.ozon.ru/'
@@ -33,7 +37,7 @@ const COMPOSER_APIS = [
 ]
 
 export interface DownloadOzonReceiptsOptions {
-  month: string
+  period: Period
   headed?: boolean
   outputPath?: string
   browser?: OzonBrowserChannel
@@ -89,12 +93,10 @@ export async function saveOzonSession(options: SaveOzonSessionOptions = {}): Pro
   }
 }
 
-export async function downloadOzonReceiptsForMonth(
+export async function downloadOzonReceiptsForPeriod(
   options: DownloadOzonReceiptsOptions,
 ): Promise<DownloadOzonReceiptsResult> {
-  if (!/^\d{4}-\d{2}$/.test(options.month)) {
-    throw new Error('Укажите месяц в формате YYYY-MM, например 2026-03.')
-  }
+  const parsedPeriod = parsePeriod(options.period)
 
   const { context, channelLabel } = await launchOzonContext({
     headed: options.headed !== false,
@@ -102,31 +104,35 @@ export async function downloadOzonReceiptsForMonth(
   })
 
   console.log(`[Ozon Checks] Браузер: ${channelLabel}`)
+  console.log(`[Ozon Checks] Период: ${options.period.from} — ${options.period.to}`)
   console.log('[Ozon Checks] Собираю чеки…')
 
   try {
     const page = context.pages()[0] ?? (await context.newPage())
     console.log('[Ozon Checks] Открываю страницу электронных чеков…')
-    const receipts = await collectReceiptsForMonth(page, context, options.month)
-    console.log(`[Ozon Checks] Распознано чеков за ${options.month}: ${receipts.length}`)
+    const receipts = await collectReceiptsForPeriod(page, context, options.period)
+    console.log(
+      `[Ozon Checks] Распознано чеков за ${options.period.from} — ${options.period.to}: ${receipts.length}`,
+    )
 
     if (receipts.length === 0) {
       throw new Error(
-        `Не удалось получить чеки за ${options.month}. Убедитесь, что на странице /my/e-check есть чеки за этот месяц.`,
+        `Не удалось получить чеки за период ${options.period.from} — ${options.period.to}. Убедитесь, что на странице /my/e-check есть чеки за этот период.`,
       )
     }
 
     const receiptsFile: OzonReceiptsFile = {
       source: 'ozon',
       exportedAt: new Date().toISOString(),
-      month: options.month,
+      period: options.period,
       receipts: receipts.sort(
         (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
       ),
     }
 
     const outputPath =
-      options.outputPath ?? join(process.cwd(), `ozon-receipts-${options.month}.json`)
+      options.outputPath ??
+      join(process.cwd(), `ozon-receipts-${parsedPeriod.key}.json`)
     await mkdir(dirname(outputPath), { recursive: true })
     await writeFile(outputPath, `${JSON.stringify(receiptsFile, null, 2)}\n`, 'utf8')
 
@@ -136,12 +142,13 @@ export async function downloadOzonReceiptsForMonth(
   }
 }
 
-async function collectReceiptsForMonth(
+async function collectReceiptsForPeriod(
   page: Page,
   context: BrowserContext,
-  month: string,
+  period: Period,
 ): Promise<OzonReceipt[]> {
   const composerPayloads: unknown[] = []
+  const months = getMonthsInPeriod(period)
 
   page.on('response', async (response) => {
     if (!isComposerResponse(response.url())) {
@@ -157,23 +164,28 @@ async function collectReceiptsForMonth(
 
   await gotoOzon(page, E_CHECK_URL)
   await ensureLoggedIn(page)
-  console.log(`[Ozon Checks] Выбираю месяц ${month}…`)
-  const monthSelected = await selectMonth(page, month)
-  if (!monthSelected) {
-    console.warn(`[Ozon Checks] Вкладка месяца ${month} не найдена — фильтрую чеки по дате в строке.`)
-  }
-  await autoScroll(page)
-  await page.waitForTimeout(1_500)
 
-  for (const payload of await fetchComposerPayloads(page, month)) {
-    composerPayloads.push(payload)
+  for (const month of months) {
+    console.log(`[Ozon Checks] Выбираю месяц ${month}…`)
+    const monthSelected = await selectMonth(page, month)
+    if (!monthSelected) {
+      console.warn(`[Ozon Checks] Вкладка месяца ${month} не найдена — фильтрую чеки по дате в строке.`)
+    }
+    await autoScroll(page)
+    await page.waitForTimeout(1_500)
   }
 
-  let receipts = filterReceiptsByMonth(
+  for (const month of months) {
+    for (const payload of await fetchComposerPayloads(page, month)) {
+      composerPayloads.push(payload)
+    }
+  }
+
+  let receipts = filterReceiptsByPeriod(
     dedupeReceipts(
       composerPayloads.flatMap((payload) => extractReceiptsFromComposer(payload)),
     ),
-    month,
+    period,
   )
 
   if (receipts.length > 0) {
@@ -187,17 +199,20 @@ async function collectReceiptsForMonth(
 
   console.log(`[Ozon Checks] Ссылок на PDF: ${downloadUrls.length}`)
   if (downloadUrls.length > 0) {
-    receipts = filterReceiptsByMonth(await downloadAndParseReceipts(context, downloadUrls, month), month)
+    receipts = filterReceiptsByPeriod(
+      await downloadAndParseReceipts(context, downloadUrls, period),
+      period,
+    )
     if (receipts.length > 0) {
       return receipts
     }
   }
 
   console.log('[Ozon Checks] Скачиваю PDF через кнопки на странице…')
-  return filterReceiptsByMonth(await downloadReceiptsViaButtons(page, month), month)
+  return filterReceiptsByPeriod(await downloadReceiptsViaButtons(page, period), period)
 }
 
-async function downloadReceiptsViaButtons(page: Page, month: string): Promise<OzonReceipt[]> {
+async function downloadReceiptsViaButtons(page: Page, period: Period): Promise<OzonReceipt[]> {
   const receipts: OzonReceipt[] = []
   const downloadButtons = page.locator(
     [
@@ -220,7 +235,8 @@ async function downloadReceiptsViaButtons(page: Page, month: string): Promise<Oz
     }
 
     const rowText = await readReceiptRowText(button)
-    if (!textMatchesMonth(rowText, month)) {
+    const rowDate = parseReceiptDateFromText(rowText)
+    if (!textMatchesPeriod(rowText, period)) {
       continue
     }
 
@@ -233,10 +249,16 @@ async function downloadReceiptsViaButtons(page: Page, month: string): Promise<Oz
 
     const receipt = await parseOzonReceiptPdfBufferAsync(buffer)
     if (receipt) {
-      if (receiptMatchesMonth(receipt.date, month)) {
+      if (rowDate) {
+        receipt.date = rowDate.toISOString()
+      }
+
+      if (receiptMatchesPeriod(receipt.date, period)) {
         receipts.push(receipt)
       } else {
-        console.warn(`[Ozon Checks] Пропуск чека вне месяца ${month}: ${receipt.date}`)
+        console.warn(
+          `[Ozon Checks] Пропуск чека вне периода ${period.from} — ${period.to}: ${receipt.date}`,
+        )
       }
       continue
     }
@@ -246,7 +268,9 @@ async function downloadReceiptsViaButtons(page: Page, month: string): Promise<Oz
     await sleep(350)
   }
 
-  console.log(`[Ozon Checks] Кнопок «Скачать» всего: ${count}, подходит за ${month}: ${matched}`)
+  console.log(
+    `[Ozon Checks] Кнопок «Скачать» всего: ${count}, подходит за ${period.from} — ${period.to}: ${matched}`,
+  )
   return dedupeReceipts(receipts)
 }
 
@@ -255,9 +279,13 @@ async function readReceiptRowText(button: Locator): Promise<string> {
     let node: HTMLElement | null = element as HTMLElement
 
     for (let depth = 0; depth < 10 && node; depth += 1) {
-      const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim()
-      if (text.length >= 20) {
-        return text
+      const text = node.textContent ?? ''
+      const normalized = text.replace(/\s+/g, ' ').trim()
+      if (/(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+\d{4}/i.test(normalized)) {
+        return normalized
+      }
+      if (normalized.length >= 20) {
+        return normalized
       }
       node = node.parentElement
     }
@@ -323,7 +351,7 @@ function isPdfResponse(response: Response): boolean {
 async function downloadAndParseReceipts(
   context: BrowserContext,
   pdfUrls: string[],
-  month: string,
+  period: Period,
 ): Promise<OzonReceipt[]> {
   const receipts: OzonReceipt[] = []
 
@@ -349,7 +377,7 @@ async function downloadAndParseReceipts(
       continue
     }
 
-    if (receiptMatchesMonth(receipt.date, month)) {
+    if (receiptMatchesPeriod(receipt.date, period)) {
       receipts.push(receipt)
     }
     await sleep(250)
@@ -423,12 +451,12 @@ async function selectMonth(page: Page, month: string): Promise<boolean> {
   return false
 }
 
-function filterReceiptsByMonth(receipts: OzonReceipt[], month: string): OzonReceipt[] {
-  const filtered = receipts.filter((receipt) => receiptMatchesMonth(receipt.date, month))
+function filterReceiptsByPeriod(receipts: OzonReceipt[], period: Period): OzonReceipt[] {
+  const filtered = receipts.filter((receipt) => receiptMatchesPeriod(receipt.date, period))
 
   if (filtered.length !== receipts.length) {
     console.log(
-      `[Ozon Checks] Фильтр ${month}: оставлено ${filtered.length} из ${receipts.length}`,
+      `[Ozon Checks] Фильтр ${period.from} — ${period.to}: оставлено ${filtered.length} из ${receipts.length}`,
     )
   }
 

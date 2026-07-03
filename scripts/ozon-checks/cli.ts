@@ -1,8 +1,11 @@
-import { downloadOzonReceiptsForMonth, saveOzonSession } from './download.js'
+import { downloadOzonReceiptsForPeriod, saveOzonSession } from './download.js'
+import { promptPeriod } from './promptPeriod.js'
+import { parseDayMonthYear, type Period } from './periodUtils.js'
 import type { OzonBrowserChannel } from './browser.js'
 
 interface CliOptions {
-  month?: string
+  from?: string
+  to?: string
   login: boolean
   headed: boolean
   outputPath?: string
@@ -46,8 +49,14 @@ function parseArgs(argv: string[]): CliOptions {
       continue
     }
 
-    if (arg === '--month') {
-      options.month = argv[index + 1]
+    if (arg === '--from') {
+      options.from = argv[index + 1]
+      index += 1
+      continue
+    }
+
+    if (arg === '--to') {
+      options.to = argv[index + 1]
       index += 1
       continue
     }
@@ -64,8 +73,13 @@ function parseArgs(argv: string[]): CliOptions {
       continue
     }
 
-    if (arg?.startsWith('--month=')) {
-      options.month = arg.slice('--month='.length)
+    if (arg?.startsWith('--from=')) {
+      options.from = arg.slice('--from='.length)
+      continue
+    }
+
+    if (arg?.startsWith('--to=')) {
+      options.to = arg.slice('--to='.length)
       continue
     }
 
@@ -85,18 +99,44 @@ function parseArgs(argv: string[]): CliOptions {
 function printHelp(): void {
   console.log(`Usage:
   npm run ozon:checks:login [-- --browser chrome|msedge|chromium]
-  npm run ozon:checks -- --month YYYY-MM [--output path/to/file.json] [--headless] [--browser chrome]
+  npm run ozon:checks [-- --from ДД-ММ-ГГГГ --to ДД-MM-ГГГГ] [--output path/to/file.json] [--headless] [--browser chrome]
 
 Examples:
   npm run ozon:checks:login
-  npm run ozon:checks:login -- --browser chrome
-  npm run ozon:checks -- --month 2026-03
-  npm run ozon:checks -- --month 2026-03 --output ./exports/march.json
+  npm run ozon:checks
+  npm run ozon:checks -- --from 01-06-2026 --to 30-06-2026
+  npm run ozon:checks -- --from 01-07-2026 --to 31-07-2026 --output ./exports/july.json
 
 Tip:
   Если Ozon не открывается, запускайте команду во внешнем терминале Windows
   (PowerShell / cmd), а не через встроенный терминал IDE.
 `)
+}
+
+function resolvePeriod(options: CliOptions): Promise<Period> {
+  if (options.from && options.to) {
+    validatePeriod({ from: options.from, to: options.to })
+    return Promise.resolve({ from: options.from, to: options.to })
+  }
+
+  if (options.from || options.to) {
+    throw new Error('Укажите обе даты периода: --from ДД-ММ-ГГГГ --to ДД-ММ-ГГГГ')
+  }
+
+  return promptPeriod()
+}
+
+function validatePeriod(period: Period): void {
+  const fromDate = parseDayMonthYear(period.from)
+  const toDate = parseDayMonthYear(period.to)
+
+  if (!fromDate || !toDate) {
+    throw new Error('Даты периода должны быть в формате ДД-ММ-ГГГГ, например 01-06-2026.')
+  }
+
+  if (fromDate.getTime() > toDate.getTime()) {
+    throw new Error('Дата начала периода не может быть позже даты конца.')
+  }
 }
 
 async function main(): Promise<void> {
@@ -112,19 +152,17 @@ async function main(): Promise<void> {
     return
   }
 
-  if (!options.month) {
-    printHelp()
-    throw new Error('Укажите месяц: --month YYYY-MM')
-  }
+  const period = await resolvePeriod(options)
 
-  const result = await downloadOzonReceiptsForMonth({
-    month: options.month,
+  const result = await downloadOzonReceiptsForPeriod({
+    period,
     headed: options.headed,
     outputPath: options.outputPath,
     browser: options.browser,
   })
 
   console.log(`[Ozon Checks] Готово: ${result.receiptsFile.receipts.length} чек(ов)`)
+  console.log(`[Ozon Checks] Период: ${period.from} — ${period.to}`)
   console.log(`[Ozon Checks] Файл: ${result.outputPath}`)
 }
 

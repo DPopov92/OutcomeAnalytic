@@ -11,9 +11,16 @@ export interface OzonReceipt {
   items: OzonReceiptItem[]
 }
 
+export interface OzonReceiptPeriod {
+  from: string
+  to: string
+}
+
 export interface OzonReceiptsFile {
   source: 'ozon'
   exportedAt: string
+  period?: OzonReceiptPeriod
+  /** @deprecated Используйте period */
   month?: string
   receipts: OzonReceipt[]
 }

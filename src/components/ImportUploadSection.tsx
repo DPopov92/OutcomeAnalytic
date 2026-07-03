@@ -154,7 +154,7 @@ function OzonFileUpload({
         <Typography variant="body2" color="text.secondary" component="div">
           Выгрузите чеки:{' '}
           <Box component="code" sx={{ fontFamily: 'monospace' }}>
-            npm run ozon:checks -- --month YYYY-MM
+            npm run ozon:checks -- --from ДД-ММ-ГГГГ --to ДД-ММ-ГГГГ
           </Box>
           <br />
           При первом запуске:{' '}
