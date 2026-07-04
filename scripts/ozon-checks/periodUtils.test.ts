@@ -19,6 +19,13 @@ test('parseRussianReceiptDateText parses Ozon row date', () => {
   assert.equal(date.getMinutes(), 15)
 })
 
+test('parseReceiptDateFromText reads date from Ozon row with order number', () => {
+  const date = parseReceiptDateFromText('1 июня 2026 в 14:24')
+  assert.ok(date)
+  assert.equal(date.getDate(), 1)
+  assert.equal(date.getMonth(), 5)
+})
+
 test('textMatchesPeriod uses receipt row date', () => {
   const period = { from: '01-06-2026', to: '30-06-2026' }
 

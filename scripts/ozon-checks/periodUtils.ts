@@ -197,6 +197,10 @@ export function parseRussianReceiptDateText(text: string): Date | null {
     return null
   }
 
+  return parseRussianReceiptDateMatch(match)
+}
+
+function parseRussianReceiptDateMatch(match: RegExpMatchArray): Date | null {
   const day = Number(match[1])
   const monthIndex = RUSSIAN_GENITIVE_MONTHS[match[2]?.toLowerCase() ?? '']
   const year = Number(match[3])

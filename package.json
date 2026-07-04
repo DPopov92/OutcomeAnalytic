@@ -15,7 +15,7 @@
     "prod:build": "npm run build",
     "prod:restart": "npm run prod:build && npm run prod",
     "lint": "oxlint",
-    "test": "tsx --test server/src/parseOzonOrders.test.ts server/src/parseOzonReceipts.test.ts server/src/buildExcelGroups.test.ts scripts/ozon-checks/composerParse.test.ts scripts/ozon-checks/periodUtils.test.ts",
+    "test": "tsx --test server/src/parseOzonOrders.test.ts server/src/parseOzonReceipts.test.ts server/src/buildExcelGroups.test.ts scripts/ozon-checks/composerParse.test.ts scripts/ozon-checks/periodUtils.test.ts scripts/ozon-checks/domCheques.test.ts",
     "ozon:checks": "tsx scripts/ozon-checks/cli.ts",
     "ozon:checks:login": "tsx scripts/ozon-checks/cli.ts --login",
     "ozon:checks:install": "playwright install chromium",
