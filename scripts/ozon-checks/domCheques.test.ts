@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
+  dedupeTargetsByOrderNumber,
   extractOrderNumberFromRowText,
   extractReceiptDateText,
   monthOverlapsPeriod,
@@ -50,6 +51,19 @@ test('parseChequesWidgetsHtml extracts June receipts from fixture', async () => 
   assert.equal(rows.length, 31)
   assert.equal(rows[0]?.monthTitle, 'Июнь 2026')
   assert.match(rows[0]?.rowText ?? '', /30 июня 2026/)
+})
+
+test('dedupeTargetsByOrderNumber keeps first receipt per order', () => {
+  const { targets, skipped } = dedupeTargetsByOrderNumber([
+    { orderNumber: '36246682-0288' },
+    { orderNumber: '36246682-0288' },
+    { orderNumber: '36246682-0287' },
+    { orderNumber: null },
+    { orderNumber: null },
+  ])
+
+  assert.equal(targets.length, 4)
+  assert.equal(skipped, 1)
 })
 
 test('extractOrderNumberFromRowText parses Ozon order id', () => {

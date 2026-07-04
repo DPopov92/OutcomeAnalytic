@@ -347,6 +347,29 @@ async function expandMonthReceiptList(page: Page, widget: Locator): Promise<void
   }
 }
 
+export function dedupeTargetsByOrderNumber<T extends { orderNumber: string | null }>(
+  targets: T[],
+): { targets: T[]; skipped: number } {
+  const seenOrderNumbers = new Set<string>()
+  const kept: T[] = []
+  let skipped = 0
+
+  for (const target of targets) {
+    if (target.orderNumber && seenOrderNumbers.has(target.orderNumber)) {
+      skipped += 1
+      continue
+    }
+
+    if (target.orderNumber) {
+      seenOrderNumbers.add(target.orderNumber)
+    }
+
+    kept.push(target)
+  }
+
+  return { targets: kept, skipped }
+}
+
 export async function collectReceiptDownloadTargets(
   page: Page,
   period: Period,
@@ -403,7 +426,16 @@ export async function collectReceiptDownloadTargets(
     }
   }
 
-  return targets
+  const { targets: uniqueTargets, skipped: skippedDuplicateOrders } =
+    dedupeTargetsByOrderNumber(targets)
+
+  if (skippedDuplicateOrders > 0) {
+    console.log(
+      `[Ozon Checks] Пропущено чеков с повторным номером заказа: ${skippedDuplicateOrders}`,
+    )
+  }
+
+  return uniqueTargets
 }
 
 function extractDateSourceFromRowHtml(rowHtml: string): string | null {
